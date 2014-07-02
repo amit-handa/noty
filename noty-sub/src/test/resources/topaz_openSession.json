@@ -1,0 +1,2 @@
+{ "http" : [ "post", "/pint/sessions" ],
+	"body" : "ahanda" }

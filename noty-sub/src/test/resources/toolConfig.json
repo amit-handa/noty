@@ -1,0 +1,169 @@
+{ "eventSources" : {
+	"NightCycle" : {
+		"idInfo" : [
+		  { "Env" : [ "PROD", "BETA" ] },
+		  { "region" : [ "U", "A", "E" ] },
+		  { "dboEnv" : [ "PM", "PIMCO" ] },
+		  { "dbEnv" : [ "SYBBTAPIM", "SYBPRODPIM", "ORABTAPIM", "ORAPRODPIM" ] } ],
+		"ids" : [
+			{
+			 "dbEnv" : "SYBBTAPIM",
+			 "region" : "U",
+			 "Env" : "BETA",
+			 "dboEnv" : "PM"
+			},
+		  {
+			 "dbEnv" : "SYBBTAPIM",
+			 "region" : "U",
+			 "Env" : "BETA",
+			 "dboEnv" : "PIMCO"
+		  },
+		  {
+			 "dbEnv" : "SYBPRODPIM",
+			 "region" : "U",
+			 "Env" : "PROD",
+			 "dboEnv" : "PM"
+		  },
+		  {
+			 "dbEnv" : "SYBPRODPIM",
+			 "region" : "U",
+			 "Env" : "PROD",
+			 "dboEnv" : "PIMCO"
+		  },
+		  {
+			 "dbEnv" : "ORABTAPIM",
+			 "region" : "U",
+			 "Env" : "BETA",
+			 "dboEnv" : "PM"
+		  },
+		  {
+			 "dbEnv" : "ORABTAPIM",
+			 "region" : "U",
+			 "Env" : "BETA",
+			 "dboEnv" : "PIMCO"
+		  },
+		  {
+			 "dbEnv" : "ORAPRODPIM",
+			 "region" : "U",
+			 "Env" : "PROD",
+			 "dboEnv" : "PM"
+		  },
+		  {
+			 "dbEnv" : "ORAPRODPIM",
+			 "region" : "U",
+			 "Env" : "PROD",
+			 "dboEnv" : "PIMCO"
+		  },
+		  {
+			 "dbEnv" : "SYBBTAPIM",
+			 "region" : "A",
+			 "Env" : "BETA",
+			 "dboEnv" : "PM"
+		  },
+		  {
+			 "dbEnv" : "SYBBTAPIM",
+			 "region" : "A",
+			 "Env" : "BETA",
+			 "dboEnv" : "PIMCO"
+		  },
+		  {
+			 "dbEnv" : "SYBPRODPIM",
+			 "region" : "A",
+			 "Env" : "PROD",
+			 "dboEnv" : "PM"
+		  },
+		  {
+			 "dbEnv" : "SYBPRODPIM",
+			 "region" : "A",
+			 "Env" : "PROD",
+			 "dboEnv" : "PIMCO"
+		  },
+		  {
+			 "dbEnv" : "ORABTAPIM",
+			 "region" : "A",
+			 "Env" : "BETA",
+			 "dboEnv" : "PM"
+		  },
+		  {
+			 "dbEnv" : "ORABTAPIM",
+			 "region" : "A",
+			 "Env" : "BETA",
+			 "dboEnv" : "PIMCO"
+		  },
+		  {
+			 "dbEnv" : "ORAPRODPIM",
+			 "region" : "A",
+			 "Env" : "PROD",
+			 "dboEnv" : "PM"
+		  },
+		  {
+			 "dbEnv" : "ORAPRODPIM",
+			 "region" : "A",
+			 "Env" : "PROD",
+			 "dboEnv" : "PIMCO"
+		  },
+		  {
+			 "dbEnv" : "SYBBTAPIM",
+			 "region" : "E",
+			 "Env" : "BETA",
+			 "dboEnv" : "PM"
+		  },
+		  {
+			 "dbEnv" : "SYBBTAPIM",
+			 "region" : "E",
+			 "Env" : "BETA",
+			 "dboEnv" : "PIMCO"
+		  },
+		  {
+			 "dbEnv" : "SYBPRODPIM",
+			 "region" : "E",
+			 "Env" : "PROD",
+			 "dboEnv" : "PM"
+		  },
+		  {
+			 "dbEnv" : "SYBPRODPIM",
+			 "region" : "E",
+			 "Env" : "PROD",
+			 "dboEnv" : "PIMCO"
+		  },
+		  {
+			 "dbEnv" : "ORABTAPIM",
+			 "region" : "E",
+			 "Env" : "BETA",
+			 "dboEnv" : "PM"
+		  },
+		  {
+			 "dbEnv" : "ORABTAPIM",
+			 "region" : "E",
+			 "Env" : "BETA",
+			 "dboEnv" : "PIMCO"
+		  },
+		  {
+			 "dbEnv" : "ORAPRODPIM",
+			 "region" : "E",
+			 "Env" : "PROD",
+			 "dboEnv" : "PM"
+		  },
+		  {
+			 "dbEnv" : "ORAPRODPIM",
+			 "region" : "E",
+			 "Env" : "PROD",
+			 "dboEnv" : "PIMCO"
+		  }
+		]
+	},
+	"Topaz" : {
+		"idInfo" : [
+			{ "Env" : [ "PROD", "BETA" ] }
+		],
+		"ids" : [
+			{ "Env" : "PROD" },
+			{ "Env" : "BETA" }
+		]
+	}
+  },
+  "eSrcClass" : {
+	"NightCycle" : "NCD",
+	"Topaz" : "Topaz"
+  }
+}

@@ -1,0 +1,6 @@
+{ "http" : [ "post", "/pint/events/search" ],
+	"body" : [ "EventCache", "findEvents", {
+		"eventSource" : { "type" : "Topaz", "body" : { "name" : "Topaz" } },
+		"events" : { "body" : "#cmpDate( #e.eTime, \"Feb 10 2014 02:11:16\") > 0" }
+	} ]
+}

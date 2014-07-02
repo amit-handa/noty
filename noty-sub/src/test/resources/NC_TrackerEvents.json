@@ -1,0 +1,18 @@
+{ "http" : [ "post", "/pint/events" ],
+  "body" : {
+	"eventSource" : {
+ "type" : "NCD", "body" : { "dbEnv" : "SYBBTAPIM"  , "ncEnv" : "BETA"  , "region" : "U"  , "dboEnv" : "PM" 	} },
+	"events" : {
+		 "cycleDate" : "Feb 10 2014 00:00:00",
+		"body" : [ {  "eId" : { "ids" : [ "", "P4BO-000" ] },
+		"eTypeInfo" : { "progName" : "poll_for_bo_cycle.csh",
+			"desc" : "main            " },
+		"eInfo" : { "hostname" : "betapm",
+			"pid" : "1005" },
+		"eTime" : "Feb 10 2014 23:56:31",
+		"endTime" : "Feb 11 2014 03:20:55",
+		"status" : "0" }
+		]
+	}
+  }
+}

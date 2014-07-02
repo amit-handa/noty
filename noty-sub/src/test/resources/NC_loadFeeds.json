@@ -1,0 +1,9 @@
+{ "http" : [ "post", "/pint/events/search" ],
+	"body" : [ "EventCache", "findEvents", {
+		"eventSource" : {
+			 "type" : "NCD", "body" : { "dbEnv" : "SYBBTAPIM"  , "ncEnv" : "BETA"  , "region" : "U"  , "dboEnv" : "PM" 	} },
+		"events" : {
+			 "cycleDate" : "Feb 10 2014 00:00:00",
+			"body" : "#cmpDate( #e.eTime, \"Feb 10 2014 02:11:16\") > 0" }
+	} ]
+}

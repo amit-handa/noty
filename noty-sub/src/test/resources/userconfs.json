@@ -1,0 +1,11 @@
+{ "ahanda" : {
+	"role" : "admin",
+	"password" : "ahanda@123",
+	"uiLayout" : "ahanda user config" },
+
+  "pintUI" : {
+	"role" : "user",
+	"password" : "pintUI@123",
+	"uiLayout" : "UI user config" }
+}
+
