@@ -31,12 +31,12 @@ public class ServerMain
 			b.group(workers).channel(NioServerSocketChannel.class) // (3)
 					.childHandler(new ChannelInitializer<SocketChannel>()
 					{
-								@Override
-								public void initChannel(SocketChannel ch) throws Exception
-								{
-									ch.pipeline().addLast(new PintMessageHandler());
-								}
-							}).option(ChannelOption.SO_BACKLOG, 128) // (5)
+						@Override
+						public void initChannel(SocketChannel ch) throws Exception
+						{
+							ch.pipeline().addLast(new PintMessageHandler());
+						}
+					}).option(ChannelOption.SO_BACKLOG, 128) // (5)
 					.childOption(ChannelOption.SO_KEEPALIVE, true); // (6)
 
 			// Bind and start to accept incoming connections.

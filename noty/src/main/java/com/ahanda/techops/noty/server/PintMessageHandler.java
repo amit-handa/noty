@@ -1,8 +1,11 @@
 package com.ahanda.techops.noty.server;
 
-import com.ahanda.techops.noty.pojo.RequestObject;
+import org.json.JSONObject;
 
-import io.netty.channel.ChannelHandler;
+import com.ahanda.techops.noty.NotyConstants;
+import com.ahanda.techops.noty.pojo.RequestObject;
+import com.ahanda.techops.noty.pojo.RequestType;
+
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.SimpleChannelInboundHandler;
 
@@ -10,14 +13,36 @@ public class PintMessageHandler extends SimpleChannelInboundHandler<RequestObjec
 {
 
 	/**
-	 *  This methid will get called when a new request is received
+	 * This method will get called when a new request is received
 	 */
 	@Override
 	protected void channelRead0(ChannelHandlerContext arg0, RequestObject msg) throws Exception
 	{
-		
+		if (msg != null)
+		{
+			JSONObject req = msg.getJSONRequest();
+			RequestType type = RequestType.valueOf(req.optInt(NotyConstants.REQUEST_TYPE));
+			switch (type)
+			{
+			case CONNECT:
+				break;
+			case DISCONNECT:
+				break;
+			case PUBLISH:
+				handlePublish(req);
+				break;
+			}
+		}
 
 	}
 
+	private void handlePublish(JSONObject req)
+	{
+		JSONObject event = req.getJSONObject(NotyConstants.PUBLISH_EVENT);
+		if(event != null)
+		{
+			// push to JMS
+		}
+	}
 
 }
