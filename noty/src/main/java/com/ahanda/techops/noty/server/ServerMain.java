@@ -1,8 +1,5 @@
 package com.ahanda.techops.noty.server;
 
-import com.ahanda.techops.noty.ReqEncoder;
-import com.ahanda.techops.noty.ReqHandler;
-
 import io.netty.bootstrap.ServerBootstrap;
 import io.netty.channel.ChannelFuture;
 import io.netty.channel.ChannelInitializer;
@@ -37,8 +34,6 @@ public class ServerMain
 								@Override
 								public void initChannel(SocketChannel ch) throws Exception
 								{
-									ch.pipeline().addLast(new ReqEncoder());
-									ch.pipeline().addLast(new ReqHandler());
 									ch.pipeline().addLast(new PintMessageHandler());
 								}
 							}).option(ChannelOption.SO_BACKLOG, 128) // (5)
