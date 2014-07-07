@@ -16,7 +16,7 @@ public class PintMessageHandler extends SimpleChannelInboundHandler<RequestObjec
 	protected void channelRead0(ChannelHandlerContext arg0, RequestObject msg) throws Exception
 	{
 		
-		
+
 	}
 
 
