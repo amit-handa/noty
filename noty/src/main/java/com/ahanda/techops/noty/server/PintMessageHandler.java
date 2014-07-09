@@ -3,6 +3,7 @@ package com.ahanda.techops.noty.server;
 import org.json.JSONObject;
 
 import com.ahanda.techops.noty.NotyConstants;
+import com.ahanda.techops.noty.db.MongoDBManager;
 import com.ahanda.techops.noty.pojo.RequestObject;
 import com.ahanda.techops.noty.pojo.RequestType;
 
@@ -38,10 +39,19 @@ public class PintMessageHandler extends SimpleChannelInboundHandler<RequestObjec
 
 	private void handlePublish(JSONObject req)
 	{
-		JSONObject event = req.getJSONObject(NotyConstants.PUBLISH_EVENT);
-		if(event != null)
+		try
 		{
-			// push to JMS
+			JSONObject event = req.getJSONObject(NotyConstants.PUBLISH_EVENT);
+			if (event != null)
+			{
+				// insert the event in DB
+				MongoDBManager.getInstance().insertEvent(event);
+				// publish the event to queue
+			}
+		}
+		catch (Exception e)
+		{
+
 		}
 	}
 

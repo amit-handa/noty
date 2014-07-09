@@ -4,4 +4,5 @@ public class NotyConstants
 {
 	public static final String REQUEST_TYPE = "request_type";
 	public static final String PUBLISH_EVENT = "publish_event";
+	public static final String EVENTS_COLLECTION = "events_collections";
 }

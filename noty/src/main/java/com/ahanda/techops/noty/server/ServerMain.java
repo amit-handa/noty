@@ -9,12 +9,13 @@ import io.netty.channel.nio.NioEventLoopGroup;
 import io.netty.channel.socket.SocketChannel;
 import io.netty.channel.socket.nio.NioServerSocketChannel;
 
+import com.ahanda.techops.noty.db.MongoDBManager;
+
 /**
  * Discards any incoming data.
  */
 public class ServerMain
 {
-
 	private int port;
 
 	public ServerMain(int port)
@@ -27,6 +28,7 @@ public class ServerMain
 		EventLoopGroup workers = new NioEventLoopGroup();
 		try
 		{
+			MongoDBManager.getInstance();
 			ServerBootstrap b = new ServerBootstrap(); // (2)
 			b.group(workers).channel(NioServerSocketChannel.class) // (3)
 					.childHandler(new ChannelInitializer<SocketChannel>()
@@ -46,6 +48,10 @@ public class ServerMain
 			// In this example, this does not happen, but you can do that to gracefully
 			// shut down your server.
 			f.channel().closeFuture().sync();
+		}
+		catch(Exception e)
+		{
+			e.printStackTrace();
 		}
 		finally
 		{
