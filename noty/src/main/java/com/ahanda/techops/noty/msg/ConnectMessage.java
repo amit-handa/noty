@@ -99,7 +99,6 @@ public class ConnectMessage extends Message
         dis.readUTF(); //PROTOCOL_ID
         dis.read(); //PROTOCOL_VERSION
         byte flags = dis.readByte(); //flags
-        //System.out.println("Flag : " + flags);
 
         keepAlive = dis.readShort();
         String id = dis.readUTF();
@@ -112,6 +111,7 @@ public class ConnectMessage extends Message
 
         username = ((flags & 0x80) == 0) ? null : dis.readUTF();
         password = ((flags & 0x40) == 0) ? null : dis.readUTF();
+        System.out.println( String.format( "Flag %s id %s username %s password %s", flags, id, username, password ) );
 
         retainWill = ((flags & 0x20) > 0);
         willQoS = QoS.valueOf((byte) ((flags & 0x18) >>> 3));
@@ -119,32 +119,10 @@ public class ConnectMessage extends Message
 
     private void setClientIdAndVersion(String id)
     {
-        //System.out.println("Client Id : " + clientId);
-        String[] parts = id.split(":");
-        this.parts = parts;
-        this.clientId = parts[0];
-        this.version = 0;
+        this.clientId = id;
         this.autoSubscribeDefaultTopics = false;
-        if (parts.length > 1)
-        {
-            try
-            {
-                this.version = Integer.parseInt(parts[1]);
-            }
-            catch (NumberFormatException e)
-            {
-                System.out.println("Invalid version " + clientId);
-            }
-        }
-        if (parts.length > 2)
-        {
-            this.autoSubscribeDefaultTopics = Boolean.valueOf(parts[2]);
-        }
-        if (parts.length > 3)
-        {
-            this.pushReconnect = Boolean.valueOf(parts[3]);
-        }
-        
+        this.version = 1;	//todo
+        this.pushReconnect = false;	//todo
     }
 
     public void setCredentials(String username, String password)

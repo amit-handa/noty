@@ -4,11 +4,14 @@ import io.netty.bootstrap.ServerBootstrap;
 import io.netty.channel.ChannelFuture;
 import io.netty.channel.ChannelInitializer;
 import io.netty.channel.ChannelOption;
+import io.netty.channel.ChannelPipeline;
 import io.netty.channel.EventLoopGroup;
 import io.netty.channel.nio.NioEventLoopGroup;
 import io.netty.channel.socket.SocketChannel;
 import io.netty.channel.socket.nio.NioServerSocketChannel;
 
+import com.ahanda.techops.noty.msg.MqttMessageDecoder;
+import com.ahanda.techops.noty.msg.MqttMessageEncoder;
 import com.ahanda.techops.noty.db.MongoDBManager;
 
 /**
@@ -36,10 +39,15 @@ public class ServerMain
 						@Override
 						public void initChannel(SocketChannel ch) throws Exception
 						{
-							ch.pipeline().addLast(new PintMessageHandler());
+							ChannelPipeline chp = ch.pipeline();
+							chp.addLast( "decoder", new MqttMessageDecoder());
+							chp.addLast( "encoder", new MqttMessageEncoder());
+							chp.addLast( new PintMQTTMessageHandler() );
 						}
 					}).option(ChannelOption.SO_BACKLOG, 128) // (5)
 					.childOption(ChannelOption.SO_KEEPALIVE, true); // (6)
+
+			System.out.println("Created server on port " + port );
 
 			// Bind and start to accept incoming connections.
 			ChannelFuture f = b.bind(port).sync(); // (7)

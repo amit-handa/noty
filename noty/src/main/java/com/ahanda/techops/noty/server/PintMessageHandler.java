@@ -19,6 +19,7 @@ public class PintMessageHandler extends SimpleChannelInboundHandler<RequestObjec
 	@Override
 	protected void channelRead0(ChannelHandlerContext arg0, RequestObject msg) throws Exception
 	{
+		System.out.println( "received message " + msg );
 		if (msg != null)
 		{
 			JSONObject req = msg.getJSONRequest();

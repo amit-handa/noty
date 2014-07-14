@@ -49,6 +49,7 @@ public class MqttMessageDecoder extends ByteToMessageDecoder
         MessageInputStream mis = new MessageInputStream(
                 new ByteArrayInputStream(data));
         Message msg = mis.readMessage();
+        out.add( msg );
         return ;
     }
 

@@ -21,12 +21,17 @@ public class RequestObject
 		}
 		catch (Exception e)
 		{
-			obj = new JSONObject();
+			System.out.println( "Oh ho ... jsonobject exception received !" + e.getMessage() );
 		}
 	}
 	
 	public JSONObject getJSONRequest()
 	{
 		return obj;
+	}
+
+	public void setJSONRequest( JSONObject obj )
+	{
+		this.obj = obj;
 	}
 }
