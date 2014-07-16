@@ -9,6 +9,9 @@ import io.netty.channel.EventLoopGroup;
 import io.netty.channel.nio.NioEventLoopGroup;
 import io.netty.channel.socket.SocketChannel;
 import io.netty.channel.socket.nio.NioServerSocketChannel;
+import io.netty.handler.codec.http.HttpRequestDecoder;
+import io.netty.handler.codec.http.HttpRequestEncoder;
+import io.netty.handler.codec.http.HttpResponseEncoder;
 
 import com.ahanda.techops.noty.msg.MqttMessageDecoder;
 import com.ahanda.techops.noty.msg.MqttMessageEncoder;
@@ -40,9 +43,9 @@ public class ServerMain
 						public void initChannel(SocketChannel ch) throws Exception
 						{
 							ChannelPipeline chp = ch.pipeline();
-							chp.addLast( "decoder", new MqttMessageDecoder());
-							chp.addLast( "encoder", new MqttMessageEncoder());
-							chp.addLast( new PintMQTTMessageHandler() );
+							chp.addLast( "decoder", new HttpRequestDecoder());
+							chp.addLast( "encoder", new HttpResponseEncoder());
+							chp.addLast( new ServerHandler() );
 						}
 					}).option(ChannelOption.SO_BACKLOG, 128) // (5)
 					.childOption(ChannelOption.SO_KEEPALIVE, true); // (6)
