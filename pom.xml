@@ -31,8 +31,7 @@
 		<netty.version>4.0.20.Final</netty.version>
 		<jackson.version>2.2.2</jackson.version>
 		<json.version>20140107</json.version>
-		<log4j.version>1.2.16</log4j.version>
-		<slf4j.version>1.6.2</slf4j.version>
+		<logback.version>1.0.13</logback.version>
 		<activemq.version>5.2.0</activemq.version>
 		<mongo.version>2.12.2</mongo.version>
 		<paho.version>0.4.0</paho.version>
@@ -84,14 +83,14 @@
 				<version>${jackson.version}</version>
 			</dependency>
 			<dependency>
-				<groupId>log4j</groupId>
-				<artifactId>log4j</artifactId>
-				<version>${log4j.version}</version>
+				<groupId>ch.qos.logback</groupId>
+				<artifactId>logback-core</artifactId>
+				<version>${logback.version}</version>
 			</dependency>
 			<dependency>
-				<groupId>org.slf4j</groupId>
-				<artifactId>slf4j-api</artifactId>
-				<version>${slf4j.version}</version>
+				<groupId>ch.qos.logback</groupId>
+				<artifactId>logback-classic</artifactId>
+				<version>${logback.version}</version>
 			</dependency>
 			<dependency>
 			    <groupId>org.eclipse.paho</groupId>

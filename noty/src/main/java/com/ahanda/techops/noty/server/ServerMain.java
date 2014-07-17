@@ -9,6 +9,7 @@ import io.netty.channel.EventLoopGroup;
 import io.netty.channel.nio.NioEventLoopGroup;
 import io.netty.channel.socket.SocketChannel;
 import io.netty.channel.socket.nio.NioServerSocketChannel;
+import io.netty.handler.codec.http.HttpObjectAggregator;
 import io.netty.handler.codec.http.HttpRequestDecoder;
 import io.netty.handler.codec.http.HttpRequestEncoder;
 import io.netty.handler.codec.http.HttpResponseEncoder;
@@ -45,7 +46,8 @@ public class ServerMain
 							ChannelPipeline chp = ch.pipeline();
 							chp.addLast( "decoder", new HttpRequestDecoder());
 							chp.addLast( "encoder", new HttpResponseEncoder());
-							chp.addLast( new ServerHandler() );
+							chp.addLast( "aggregator", new HttpObjectAggregator( 1048576 ) );
+							chp.addLast( "handler", new ServerHandler() );
 						}
 					}).option(ChannelOption.SO_BACKLOG, 128) // (5)
 					.childOption(ChannelOption.SO_KEEPALIVE, true); // (6)

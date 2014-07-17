@@ -124,8 +124,8 @@ public final class Client {
             // Set some example cookies.
             request.headers().set( HttpHeaders.Names.COOKIE,
                     ClientCookieEncoder.encode(
-                            new DefaultCookie("my-cookie", "foo"),
-                            new DefaultCookie("another-cookie", "bar")));
+                            new DefaultCookie("userId", "ahanda"),
+                            new DefaultCookie("sessStart", "kal")));
 
             // Send the HTTP request.
             ch.writeAndFlush(request);

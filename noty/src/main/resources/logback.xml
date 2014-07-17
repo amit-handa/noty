@@ -14,13 +14,13 @@
 </appender-->
 
 <appender name="rollingLogger" class="ch.qos.logback.core.rolling.RollingFileAppender">
-  <file>${PINT.logdir}/pint.log</file>
+  <file>C:/Pint/pint.log</file>
   <encoder class="ch.qos.logback.classic.encoder.PatternLayoutEncoder">
 	  <Pattern>>%d{"yyyy-MM-dd'T'HH:mm:ss.SSS'Z'",UTC} [%thread] %-5level %logger{36} - %msg%n</Pattern>
   </encoder>
 
   <rollingPolicy class="ch.qos.logback.core.rolling.TimeBasedRollingPolicy">
-	  <fileNamePattern>${PINT.logdir}/pint.%d{yyyy-MM-dd}.%i.gz
+	  <fileNamePattern>C:/Pint/pint.%d{yyyy-MM-dd}.%i.gz
 	  </fileNamePattern>
 	  <timeBasedFileNamingAndTriggeringPolicy
 		  class="ch.qos.logback.core.rolling.SizeAndTimeBasedFNATP">
