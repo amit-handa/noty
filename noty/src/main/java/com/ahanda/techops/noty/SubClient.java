@@ -1,10 +1,15 @@
 package com.ahanda.techops.noty;
 
-import io.netty.bootstrap.Bootstrap;
+import com.ahanda.techops.noty.msg.ConnectMessage;
+import com.ahanda.techops.noty.msg.MqttMessageDecoder;
+import com.ahanda.techops.noty.msg.MqttMessageEncoder;
+import com.ahanda.techops.noty.server.PintMQTTMessageHandler;
 
+import io.netty.bootstrap.Bootstrap;
 import io.netty.channel.ChannelFuture;
 import io.netty.channel.ChannelInitializer;
 import io.netty.channel.ChannelOption;
+import io.netty.channel.ChannelPipeline;
 import io.netty.channel.EventLoopGroup;
 import io.netty.channel.nio.NioEventLoopGroup;
 import io.netty.channel.socket.SocketChannel;
@@ -33,13 +38,19 @@ public class SubClient {
              .handler(new ChannelInitializer<SocketChannel>() { // (4)
                  @Override
                  public void initChannel(SocketChannel ch) throws Exception {
-                     ch.pipeline().addLast( new RespDecoder(), new RespHandler());
+                        ChannelPipeline chp = ch.pipeline();
+                        chp.addLast( "decoder", new MqttMessageDecoder());
+                        chp.addLast( "encoder", new MqttMessageEncoder());
+                        chp.addLast( new PintMQTTMessageHandler() );
                  }
              });
 
             // Bind and start to accept incoming connections.
             ChannelFuture f = b.connect( host, port).sync(); // (7)
 
+            ConnectMessage msg = new ConnectMessage( "ownImpl", true, (short)1 );
+            msg.setCredentials( "ahanda", "ahandaPwd");
+            f.channel().writeAndFlush(msg);
             // Wait until the Client socket is closed.
             // In this example, this does not happen, but you can do that to gracefully
             // shut down your Client.

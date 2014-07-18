@@ -7,20 +7,20 @@
 <!--property resource="${ENV}.properties"/-->
 
     <!-- WARN or higher goes to STDOUT -->
-<!--appender name="STDOUT" class="ch.qos.logback.core.ConsoleAppender">
+<appender name="STDOUT" class="ch.qos.logback.core.ConsoleAppender">
   <layout class="ch.qos.logback.classic.PatternLayout">
 	<Pattern>%d{"yyyy-MM-dd'T'HH:mm:ss.SSS'Z'",UTC} [%thread] %-5level %logger{36} - %msg%n</Pattern>
   </layout>
-</appender-->
+</appender>
 
 <appender name="rollingLogger" class="ch.qos.logback.core.rolling.RollingFileAppender">
-  <file>C:/Pint/pint.log</file>
+  <file>/home/amit/pint/pint.log</file>
   <encoder class="ch.qos.logback.classic.encoder.PatternLayoutEncoder">
 	  <Pattern>>%d{"yyyy-MM-dd'T'HH:mm:ss.SSS'Z'",UTC} [%thread] %-5level %logger{36} - %msg%n</Pattern>
   </encoder>
 
   <rollingPolicy class="ch.qos.logback.core.rolling.TimeBasedRollingPolicy">
-	  <fileNamePattern>C:/Pint/pint.%d{yyyy-MM-dd}.%i.gz
+	  <fileNamePattern>/home/amit/pint/pint.%d{yyyy-MM-dd}.%i.gz
 	  </fileNamePattern>
 	  <timeBasedFileNamingAndTriggeringPolicy
 		  class="ch.qos.logback.core.rolling.SizeAndTimeBasedFNATP">
@@ -45,8 +45,8 @@
 </appender-->
 
 <root level="INFO">
-  <!--appender-ref ref="STDOUT" />
-  <appender-ref ref="emailNotifier" /-->
+  <appender-ref ref="STDOUT" />
+  <!--appender-ref ref="emailNotifier" /-->
   <appender-ref ref="rollingLogger" />
 </root>
 

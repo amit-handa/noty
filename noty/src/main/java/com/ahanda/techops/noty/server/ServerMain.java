@@ -1,5 +1,8 @@
 package com.ahanda.techops.noty.server;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import io.netty.bootstrap.ServerBootstrap;
 import io.netty.channel.ChannelFuture;
 import io.netty.channel.ChannelInitializer;
@@ -13,6 +16,7 @@ import io.netty.handler.codec.http.HttpObjectAggregator;
 import io.netty.handler.codec.http.HttpRequestDecoder;
 import io.netty.handler.codec.http.HttpRequestEncoder;
 import io.netty.handler.codec.http.HttpResponseEncoder;
+import io.netty.handler.codec.http.HttpServerCodec;
 
 import com.ahanda.techops.noty.msg.MqttMessageDecoder;
 import com.ahanda.techops.noty.msg.MqttMessageEncoder;
@@ -24,6 +28,8 @@ import com.ahanda.techops.noty.db.MongoDBManager;
 public class ServerMain
 {
 	private int port;
+
+	private static final Logger l = LoggerFactory.getLogger(ServerMain.class);
 
 	public ServerMain(int port)
 	{
@@ -44,15 +50,16 @@ public class ServerMain
 						public void initChannel(SocketChannel ch) throws Exception
 						{
 							ChannelPipeline chp = ch.pipeline();
-							chp.addLast( "decoder", new HttpRequestDecoder());
-							chp.addLast( "encoder", new HttpResponseEncoder());
-							chp.addLast( "aggregator", new HttpObjectAggregator( 1048576 ) );
-							chp.addLast( "handler", new ServerHandler() );
+							// chp.addLast( new HttpServerCodec() );
+							chp.addLast("decoder", new HttpRequestDecoder());
+							chp.addLast("encoder", new HttpResponseEncoder());
+							chp.addLast("aggregator", new HttpObjectAggregator(1048576));
+							chp.addLast("handler", new ServerHandler());
 						}
 					}).option(ChannelOption.SO_BACKLOG, 128) // (5)
 					.childOption(ChannelOption.SO_KEEPALIVE, true); // (6)
 
-			System.out.println("Created server on port " + port );
+			l.info("Created server on port {}", port);
 
 			// Bind and start to accept incoming connections.
 			ChannelFuture f = b.bind(port).sync(); // (7)
@@ -62,7 +69,7 @@ public class ServerMain
 			// shut down your server.
 			f.channel().closeFuture().sync();
 		}
-		catch(Exception e)
+		catch (Exception e)
 		{
 			e.printStackTrace();
 		}
