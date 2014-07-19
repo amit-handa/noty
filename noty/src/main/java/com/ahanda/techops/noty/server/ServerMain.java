@@ -9,12 +9,11 @@ import io.netty.channel.EventLoopGroup;
 import io.netty.channel.nio.NioEventLoopGroup;
 import io.netty.channel.socket.SocketChannel;
 import io.netty.channel.socket.nio.NioServerSocketChannel;
+import io.netty.handler.codec.http.HttpObjectAggregator;
 import io.netty.handler.codec.http.HttpRequestDecoder;
-import io.netty.handler.codec.http.HttpRequestEncoder;
 import io.netty.handler.codec.http.HttpResponseEncoder;
+import io.netty.util.concurrent.DefaultEventExecutorGroup;
 
-import com.ahanda.techops.noty.msg.MqttMessageDecoder;
-import com.ahanda.techops.noty.msg.MqttMessageEncoder;
 import com.ahanda.techops.noty.db.MongoDBManager;
 
 /**
@@ -23,7 +22,7 @@ import com.ahanda.techops.noty.db.MongoDBManager;
 public class ServerMain
 {
 	private int port;
-
+	
 	public ServerMain(int port)
 	{
 		this.port = port;
@@ -31,6 +30,7 @@ public class ServerMain
 
 	public void run() throws Exception
 	{
+		final DefaultEventExecutorGroup group = new DefaultEventExecutorGroup(100);
 		EventLoopGroup workers = new NioEventLoopGroup();
 		try
 		{
@@ -43,14 +43,15 @@ public class ServerMain
 						public void initChannel(SocketChannel ch) throws Exception
 						{
 							ChannelPipeline chp = ch.pipeline();
-							chp.addLast( "decoder", new HttpRequestDecoder());
-							chp.addLast( "encoder", new HttpResponseEncoder());
-							chp.addLast( new ServerHandler() );
+							chp.addLast("decoder", new HttpRequestDecoder());
+							chp.addLast("encoder", new HttpResponseEncoder());
+							chp.addLast(new HttpObjectAggregator(65536));
+							chp.addLast(group,new ServerHandler());
 						}
 					}).option(ChannelOption.SO_BACKLOG, 128) // (5)
 					.childOption(ChannelOption.SO_KEEPALIVE, true); // (6)
 
-			System.out.println("Created server on port " + port );
+			System.out.println("Created server on port " + port);
 
 			// Bind and start to accept incoming connections.
 			ChannelFuture f = b.bind(port).sync(); // (7)
@@ -60,7 +61,7 @@ public class ServerMain
 			// shut down your server.
 			f.channel().closeFuture().sync();
 		}
-		catch(Exception e)
+		catch (Exception e)
 		{
 			e.printStackTrace();
 		}

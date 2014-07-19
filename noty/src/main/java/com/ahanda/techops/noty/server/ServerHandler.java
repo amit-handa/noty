@@ -25,12 +25,16 @@ import io.netty.handler.codec.DecoderResult;
 import io.netty.handler.codec.http.Cookie;
 import io.netty.handler.codec.http.CookieDecoder;
 import io.netty.handler.codec.http.DefaultFullHttpResponse;
+import io.netty.handler.codec.http.FullHttpRequest;
 import io.netty.handler.codec.http.FullHttpResponse;
 import io.netty.handler.codec.http.HttpContent;
 import io.netty.handler.codec.http.HttpHeaders;
+import io.netty.handler.codec.http.HttpMethod;
 import io.netty.handler.codec.http.HttpObject;
 import io.netty.handler.codec.http.HttpRequest;
 import io.netty.handler.codec.http.HttpResponse;
+import io.netty.handler.codec.http.HttpResponseStatus;
+import io.netty.handler.codec.http.HttpVersion;
 import io.netty.handler.codec.http.LastHttpContent;
 import io.netty.handler.codec.http.QueryStringDecoder;
 import io.netty.handler.codec.http.ServerCookieEncoder;
@@ -45,152 +49,209 @@ import static io.netty.handler.codec.http.HttpHeaders.Names.*;
 import static io.netty.handler.codec.http.HttpResponseStatus.*;
 import static io.netty.handler.codec.http.HttpVersion.*;
 
-public class ServerHandler extends SimpleChannelInboundHandler<Object> {
+public class ServerHandler extends SimpleChannelInboundHandler<FullHttpRequest>
+{
 
-    private HttpRequest request;
-    /** Buffer that stores the response content */
-    private final StringBuilder buf = new StringBuilder();
+	private FullHttpRequest request;
 
-    @Override
-    public void channelReadComplete(ChannelHandlerContext ctx) {
-        ctx.flush();
-    }
+	/** Buffer that stores the response content */
+	private final StringBuilder buf = new StringBuilder();
 
-    @Override
-    protected void channelRead0(ChannelHandlerContext ctx, Object msg) {
-        if (msg instanceof HttpRequest) {
-            HttpRequest request = this.request = (HttpRequest) msg;
+	@Override
+	public void channelReadComplete(ChannelHandlerContext ctx)
+	{
+		ctx.flush();
+	}
 
-            if (HttpHeaders.is100ContinueExpected(request)) {
-                send100Continue(ctx);
-            }
+	@Override
+	protected void channelRead0(ChannelHandlerContext ctx, FullHttpRequest msg)
+	{
+		if (msg instanceof FullHttpRequest)
+		{
+			FullHttpRequest request = this.request = (FullHttpRequest) msg;
 
-            buf.setLength(0);
-            buf.append("WELCOME TO THE PINT WEB SERVER\r\n");
-            buf.append("===================================\r\n");
+			if (HttpHeaders.is100ContinueExpected(request))
+			{
+				send100Continue(ctx);
+			}
+			HttpMethod method = request.getMethod();
 
-            buf.append("VERSION: ").append(request.getProtocolVersion()).append("\r\n");
-            buf.append("HOSTNAME: ").append(request.headers().get(HOST)).append("\r\n");
-            buf.append("REQUEST_URI: ").append(request.getUri()).append("\r\n\r\n");
+			/* This will be used mostly by publishers */
+			if (method.equals(HttpMethod.POST))
+			{
+				ByteBuf content = request.content();
+				if(content != null && content.isReadable())
+				{
+					String json = content.toString(CharsetUtil.UTF_8);
+					System.out.println(json);
+				}		
+				final FullHttpResponse response = new DefaultFullHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.OK);
+		        ctx.writeAndFlush(response).addListener(ChannelFutureListener.CLOSE);
+			}
+			/* This will be used mostly by subscribers to subscribe and get the data from the server */
+			else if (method.equals(HttpMethod.GET))
+			{
 
-            HttpHeaders headers = request.headers();
-            if (!headers.isEmpty()) {
-                for (Map.Entry<String, String> h: headers) {
-                    String key = h.getKey();
-                    String value = h.getValue();
-                    buf.append("HEADER: ").append(key).append(" = ").append(value).append("\r\n");
-                }
-                buf.append("\r\n");
-            }
+			}
+			else
+				sendError(ctx, METHOD_NOT_ALLOWED);
+			
+			buf.setLength(0);
+			buf.append("WELCOME TO THE PINT WEB SERVER\r\n");
+			buf.append("===================================\r\n");
+			buf.append("VERSION: ").append(request.getProtocolVersion()).append("\r\n");
+			buf.append("HOSTNAME: ").append(request.headers().get(HOST)).append("\r\n");
+			buf.append("REQUEST_URI: ").append(request.getUri()).append("\r\n\r\n");
 
-            QueryStringDecoder queryStringDecoder = new QueryStringDecoder(request.getUri());
-            Map<String, List<String>> params = queryStringDecoder.parameters();
-            if (!params.isEmpty()) {
-                for (Entry<String, List<String>> p: params.entrySet()) {
-                    String key = p.getKey();
-                    List<String> vals = p.getValue();
-                    for (String val : vals) {
-                        buf.append("PARAM: ").append(key).append(" = ").append(val).append("\r\n");
-                    }
-                }
-                buf.append("\r\n");
-            }
+			HttpHeaders headers = request.headers();
+			if (!headers.isEmpty())
+			{
+				for (Map.Entry<String, String> h : headers)
+				{
+					String key = h.getKey();
+					String value = h.getValue();
+					buf.append("HEADER: ").append(key).append(" = ").append(value).append("\r\n");
+				}
+				buf.append("\r\n");
+			}
 
-            appendDecoderResult(buf, request);
-        }
+			QueryStringDecoder queryStringDecoder = new QueryStringDecoder(request.getUri());
+			Map<String, List<String>> params = queryStringDecoder.parameters();
+			if (!params.isEmpty())
+			{
+				for (Entry<String, List<String>> p : params.entrySet())
+				{
+					String key = p.getKey();
+					List<String> vals = p.getValue();
+					for (String val : vals)
+					{
+						buf.append("PARAM: ").append(key).append(" = ").append(val).append("\r\n");
+					}
+				}
+				buf.append("\r\n");
+			}
 
-        if (msg instanceof HttpContent) {
-            HttpContent httpContent = (HttpContent) msg;
+			appendDecoderResult(buf, request);
+		}
 
-            ByteBuf content = httpContent.content();
-            if (content.isReadable()) {
-                buf.append("CONTENT: ");
-                buf.append(content.toString(CharsetUtil.UTF_8));
-                buf.append("\r\n");
-                appendDecoderResult(buf, request);
-            }
+		if (msg instanceof HttpContent)
+		{
+			HttpContent httpContent = (HttpContent) msg;
 
-            if (msg instanceof LastHttpContent) {
-                buf.append("END OF CONTENT\r\n");
+			ByteBuf content = httpContent.content();
+			if (content.isReadable())
+			{
+				buf.append("CONTENT: ");
+				buf.append(content.toString(CharsetUtil.UTF_8));
+				buf.append("\r\n");
+				appendDecoderResult(buf, request);
+			}
 
-                LastHttpContent trailer = (LastHttpContent) msg;
-                if (!trailer.trailingHeaders().isEmpty()) {
-                    buf.append("\r\n");
-                    for (String name: trailer.trailingHeaders().names()) {
-                        for (String value: trailer.trailingHeaders().getAll(name)) {
-                            buf.append("TRAILING HEADER: ");
-                            buf.append(name).append(" = ").append(value).append("\r\n");
-                        }
-                    }
-                    buf.append("\r\n");
-                }
+			if (msg instanceof LastHttpContent)
+			{
+				buf.append("END OF CONTENT\r\n");
 
-                if (!writeResponse(trailer, ctx) ) {
-                    // If keep-alive is off, close the connection once the content is fully written.
-                    ctx.writeAndFlush( Unpooled.EMPTY_BUFFER ).addListener(ChannelFutureListener.CLOSE);
-                }
-            }
-        }
-    }
+				LastHttpContent trailer = (LastHttpContent) msg;
+				if (!trailer.trailingHeaders().isEmpty())
+				{
+					buf.append("\r\n");
+					for (String name : trailer.trailingHeaders().names())
+					{
+						for (String value : trailer.trailingHeaders().getAll(name))
+						{
+							buf.append("TRAILING HEADER: ");
+							buf.append(name).append(" = ").append(value).append("\r\n");
+						}
+					}
+					buf.append("\r\n");
+				}
 
-    private static void appendDecoderResult(StringBuilder buf, HttpObject o) {
-        DecoderResult result = o.getDecoderResult();
-        if (result.isSuccess()) {
-            return;
-        }
+				if (!writeResponse(trailer, ctx))
+				{
+					// If keep-alive is off, close the connection once the content is fully written.
+					ctx.writeAndFlush(Unpooled.EMPTY_BUFFER).addListener(ChannelFutureListener.CLOSE);
+				}
+			}
+		}
+	}
 
-        buf.append(".. WITH DECODER FAILURE: ");
-        buf.append(result.cause());
-        buf.append("\r\n");
-    }
+	private static void appendDecoderResult(StringBuilder buf, HttpObject o)
+	{
+		DecoderResult result = o.getDecoderResult();
+		if (result.isSuccess())
+		{
+			return;
+		}
 
-    private boolean writeResponse(HttpObject currentObj, ChannelHandlerContext ctx) {
-        // Decide whether to close the connection or not.
-        boolean keepAlive = HttpHeaders.isKeepAlive(request);
-        // Build the response object.
-        FullHttpResponse response = new DefaultFullHttpResponse(
-                HTTP_1_1, currentObj.getDecoderResult().isSuccess()? OK : BAD_REQUEST,
-                Unpooled.copiedBuffer(buf.toString(), CharsetUtil.UTF_8));
+		buf.append(".. WITH DECODER FAILURE: ");
+		buf.append(result.cause());
+		buf.append("\r\n");
+	}
 
-        response.headers().set(CONTENT_TYPE, "text/plain; charset=UTF-8");
+	private boolean writeResponse(HttpObject currentObj, ChannelHandlerContext ctx)
+	{
+		// Decide whether to close the connection or not.
+		boolean keepAlive = HttpHeaders.isKeepAlive(request);
+		// Build the response object.
+		FullHttpResponse response = new DefaultFullHttpResponse(HTTP_1_1, currentObj.getDecoderResult().isSuccess() ? OK : BAD_REQUEST, Unpooled.copiedBuffer(buf.toString(),
+				CharsetUtil.UTF_8));
 
-        if (keepAlive) {
-            // Add 'Content-Length' header only for a keep-alive connection.
-            response.headers().set(CONTENT_LENGTH, response.content().readableBytes());
-            // Add keep alive header as per:
-            // - http://www.w3.org/Protocols/HTTP/1.1/draft-ietf-http-v11-spec-01.html#Connection
-            response.headers().set(CONNECTION, HttpHeaders.Values.KEEP_ALIVE);
-        }
+		response.headers().set(CONTENT_TYPE, "text/plain; charset=UTF-8");
 
-        // Encode the cookie.
-        String cookieString = request.headers().get(COOKIE);
-        if (cookieString != null) {
-            Set<Cookie> cookies = CookieDecoder.decode(cookieString);
-            if (!cookies.isEmpty()) {
-                // Reset the cookies if necessary.
-                for (Cookie cookie: cookies) {
-                    response.headers().add(SET_COOKIE, ServerCookieEncoder.encode(cookie));
-                }
-            }
-        } else {
-            // Browser sent no cookie.  Add some.
-            response.headers().add(SET_COOKIE, ServerCookieEncoder.encode("key1", "value1"));
-            response.headers().add(SET_COOKIE, ServerCookieEncoder.encode("key2", "value2"));
-        }
+		if (keepAlive)
+		{
+			// Add 'Content-Length' header only for a keep-alive connection.
+			response.headers().set(CONTENT_LENGTH, response.content().readableBytes());
+			// Add keep alive header as per:
+			// - http://www.w3.org/Protocols/HTTP/1.1/draft-ietf-http-v11-spec-01.html#Connection
+			response.headers().set(CONNECTION, HttpHeaders.Values.KEEP_ALIVE);
+		}
 
-        // Write the response.
-        ctx.write( response );
-        return keepAlive;
-    }
+		// Encode the cookie.
+		String cookieString = request.headers().get(COOKIE);
+		if (cookieString != null)
+		{
+			Set<Cookie> cookies = CookieDecoder.decode(cookieString);
+			if (!cookies.isEmpty())
+			{
+				// Reset the cookies if necessary.
+				for (Cookie cookie : cookies)
+				{
+					response.headers().add(SET_COOKIE, ServerCookieEncoder.encode(cookie));
+				}
+			}
+		}
+		else
+		{
+			// Browser sent no cookie. Add some.
+			response.headers().add(SET_COOKIE, ServerCookieEncoder.encode("key1", "value1"));
+			response.headers().add(SET_COOKIE, ServerCookieEncoder.encode("key2", "value2"));
+		}
 
-    private static void send100Continue(ChannelHandlerContext ctx) {
-        FullHttpResponse response = new DefaultFullHttpResponse(HTTP_1_1, CONTINUE);
-        ctx.write(response);
-    }
+		// Write the response.
+		ctx.write(response);
+		return keepAlive;
+	}
 
-    @Override
-    public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) {
-        cause.printStackTrace();
-        ctx.close();
-    }
+	private static void send100Continue(ChannelHandlerContext ctx)
+	{
+		FullHttpResponse response = new DefaultFullHttpResponse(HTTP_1_1, CONTINUE);
+		ctx.write(response);
+	}
+
+	@Override
+	public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause)
+	{
+		cause.printStackTrace();
+		ctx.close();
+	}
+
+	private static void sendError(ChannelHandlerContext ctx, HttpResponseStatus status)
+	{
+		FullHttpResponse response = new DefaultFullHttpResponse(HTTP_1_1, status, Unpooled.copiedBuffer("Failure: " + status + "\r\n", CharsetUtil.UTF_8));
+		response.headers().set(CONTENT_TYPE, "text/plain; charset=UTF-8");
+
+		// Close the connection as soon as the error message is sent.
+		ctx.writeAndFlush(response).addListener(ChannelFutureListener.CLOSE);
+	}
 }
