@@ -16,6 +16,7 @@
 package com.ahanda.techops.noty.server;
 
 import io.netty.buffer.ByteBuf;
+import io.netty.buffer.CompositeByteBuf;
 import io.netty.buffer.Unpooled;
 import io.netty.channel.ChannelFuture;
 import io.netty.channel.ChannelFutureListener;
@@ -25,11 +26,13 @@ import io.netty.handler.codec.DecoderResult;
 import io.netty.handler.codec.http.Cookie;
 import io.netty.handler.codec.http.CookieDecoder;
 import io.netty.handler.codec.http.DefaultFullHttpResponse;
+import io.netty.handler.codec.http.FullHttpMessage;
 import io.netty.handler.codec.http.FullHttpRequest;
 import io.netty.handler.codec.http.FullHttpResponse;
 import io.netty.handler.codec.http.HttpContent;
 import io.netty.handler.codec.http.HttpHeaders;
 import io.netty.handler.codec.http.HttpMethod;
+import io.netty.handler.codec.http.HttpMessage;
 import io.netty.handler.codec.http.HttpObject;
 import io.netty.handler.codec.http.HttpRequest;
 import io.netty.handler.codec.http.HttpResponse;
@@ -45,17 +48,21 @@ import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import static io.netty.handler.codec.http.HttpHeaders.Names.*;
 import static io.netty.handler.codec.http.HttpResponseStatus.*;
 import static io.netty.handler.codec.http.HttpVersion.*;
 
 public class ServerHandler extends SimpleChannelInboundHandler<FullHttpRequest>
 {
-
 	private FullHttpRequest request;
 
 	/** Buffer that stores the response content */
 	private final StringBuilder buf = new StringBuilder();
+
+	static final Logger l = LoggerFactory.getLogger(ServerHandler.class);
 
 	@Override
 	public void channelReadComplete(ChannelHandlerContext ctx)
@@ -63,117 +70,7 @@ public class ServerHandler extends SimpleChannelInboundHandler<FullHttpRequest>
 		ctx.flush();
 	}
 
-	@Override
-	protected void channelRead0(ChannelHandlerContext ctx, FullHttpRequest msg)
-	{
-		if (msg instanceof FullHttpRequest)
-		{
-			FullHttpRequest request = this.request = (FullHttpRequest) msg;
-
-			if (HttpHeaders.is100ContinueExpected(request))
-			{
-				send100Continue(ctx);
-			}
-			HttpMethod method = request.getMethod();
-
-			/* This will be used mostly by publishers */
-			if (method.equals(HttpMethod.POST))
-			{
-				ByteBuf content = request.content();
-				if(content != null && content.isReadable())
-				{
-					String json = content.toString(CharsetUtil.UTF_8);
-					System.out.println(json);
-				}		
-				final FullHttpResponse response = new DefaultFullHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.OK);
-		        ctx.writeAndFlush(response).addListener(ChannelFutureListener.CLOSE);
-			}
-			/* This will be used mostly by subscribers to subscribe and get the data from the server */
-			else if (method.equals(HttpMethod.GET))
-			{
-
-			}
-			else
-				sendError(ctx, METHOD_NOT_ALLOWED);
-			
-			buf.setLength(0);
-			buf.append("WELCOME TO THE PINT WEB SERVER\r\n");
-			buf.append("===================================\r\n");
-			buf.append("VERSION: ").append(request.getProtocolVersion()).append("\r\n");
-			buf.append("HOSTNAME: ").append(request.headers().get(HOST)).append("\r\n");
-			buf.append("REQUEST_URI: ").append(request.getUri()).append("\r\n\r\n");
-
-			HttpHeaders headers = request.headers();
-			if (!headers.isEmpty())
-			{
-				for (Map.Entry<String, String> h : headers)
-				{
-					String key = h.getKey();
-					String value = h.getValue();
-					buf.append("HEADER: ").append(key).append(" = ").append(value).append("\r\n");
-				}
-				buf.append("\r\n");
-			}
-
-			QueryStringDecoder queryStringDecoder = new QueryStringDecoder(request.getUri());
-			Map<String, List<String>> params = queryStringDecoder.parameters();
-			if (!params.isEmpty())
-			{
-				for (Entry<String, List<String>> p : params.entrySet())
-				{
-					String key = p.getKey();
-					List<String> vals = p.getValue();
-					for (String val : vals)
-					{
-						buf.append("PARAM: ").append(key).append(" = ").append(val).append("\r\n");
-					}
-				}
-				buf.append("\r\n");
-			}
-
-			appendDecoderResult(buf, request);
-		}
-
-		if (msg instanceof HttpContent)
-		{
-			HttpContent httpContent = (HttpContent) msg;
-
-			ByteBuf content = httpContent.content();
-			if (content.isReadable())
-			{
-				buf.append("CONTENT: ");
-				buf.append(content.toString(CharsetUtil.UTF_8));
-				buf.append("\r\n");
-				appendDecoderResult(buf, request);
-			}
-
-			if (msg instanceof LastHttpContent)
-			{
-				buf.append("END OF CONTENT\r\n");
-
-				LastHttpContent trailer = (LastHttpContent) msg;
-				if (!trailer.trailingHeaders().isEmpty())
-				{
-					buf.append("\r\n");
-					for (String name : trailer.trailingHeaders().names())
-					{
-						for (String value : trailer.trailingHeaders().getAll(name))
-						{
-							buf.append("TRAILING HEADER: ");
-							buf.append(name).append(" = ").append(value).append("\r\n");
-						}
-					}
-					buf.append("\r\n");
-				}
-
-				if (!writeResponse(trailer, ctx))
-				{
-					// If keep-alive is off, close the connection once the content is fully written.
-					ctx.writeAndFlush(Unpooled.EMPTY_BUFFER).addListener(ChannelFutureListener.CLOSE);
-				}
-			}
-		}
-	}
+	
 
 	private static void appendDecoderResult(StringBuilder buf, HttpObject o)
 	{
@@ -233,10 +130,23 @@ public class ServerHandler extends SimpleChannelInboundHandler<FullHttpRequest>
 		return keepAlive;
 	}
 
-	private static void send100Continue(ChannelHandlerContext ctx)
+	/*
+	 * void reset() { req = null; content = null; last = false; }
+	 */
+
+	@Override
+	protected void channelRead0(ChannelHandlerContext ctx, FullHttpRequest msg)
 	{
-		FullHttpResponse response = new DefaultFullHttpResponse(HTTP_1_1, CONTINUE);
-		ctx.write(response);
+		assert msg instanceof LastHttpContent;
+		l.info("received request ! {} {}", msg, msg.content().toString(CharsetUtil.UTF_8));
+		/*
+		 * if( msg instanceof HttpMessage ) { if( req != null ) l.error( "request is already assigned !!!!!!");
+		 * 
+		 * req = (HttpMessage)msg; } if( msg instanceof HttpContent ) { if( content == null ) content = ctx.alloc().compositeBuffer(); l.info( "received content !");
+		 * msg.content().retain(); content.addComponent( msg.content() ); }
+		 * 
+		 * if( msg instanceof LastHttpContent ) { assert content != null; l.info( "received last content !"); last = true; }
+		 */
 	}
 
 	@Override

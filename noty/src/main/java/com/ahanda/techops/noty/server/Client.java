@@ -26,6 +26,7 @@ import io.netty.channel.socket.nio.NioSocketChannel;
 import io.netty.handler.codec.http.ClientCookieEncoder;
 import io.netty.handler.codec.http.DefaultCookie;
 import io.netty.handler.codec.http.DefaultFullHttpRequest;
+import io.netty.handler.codec.http.FullHttpRequest;
 import io.netty.handler.codec.http.HttpClientCodec;
 import io.netty.handler.codec.http.HttpHeaders;
 import io.netty.handler.codec.http.HttpMethod;
@@ -41,6 +42,8 @@ import java.io.StringWriter;
 import java.net.URI;
 
 import org.json.JSONObject;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * A simple HTTP client that prints out the content of the HTTP response to {@link System#out} to test {@link HttpSnoopServer}.
@@ -49,6 +52,8 @@ public final class Client
 {
 
 	static final String URL = System.getProperty("url", "http://127.0.0.1:8080/events");
+
+	static final Logger l = LoggerFactory.getLogger(Client.class);
 
 	public static void main(String[] args) throws Exception
 	{
@@ -70,7 +75,7 @@ public final class Client
 
 		if (!"http".equalsIgnoreCase(scheme) && !"https".equalsIgnoreCase(scheme))
 		{
-			System.err.println("Only HTTP(S) is supported.");
+			l.warn("Only HTTP(S) is supported.");
 			return;
 		}
 
@@ -121,21 +126,24 @@ public final class Client
 			StringWriter estr = new StringWriter();
 			e.write(estr);
 			String contentStr = estr.toString();
-			HttpRequest request = new DefaultFullHttpRequest(HttpVersion.HTTP_1_1, HttpMethod.POST, uri.getRawPath(), ch.alloc().buffer().writeBytes(contentStr.getBytes()));
+			FullHttpRequest request = new DefaultFullHttpRequest(HttpVersion.HTTP_1_1, HttpMethod.POST, uri.getRawPath(), ch.alloc().buffer().writeBytes(contentStr.getBytes()));
 
 			request.headers().set(HttpHeaders.Names.HOST, host);
 			request.headers().set(HttpHeaders.Names.CONNECTION, HttpHeaders.Values.CLOSE);
 			request.headers().set(HttpHeaders.Names.ACCEPT_ENCODING, HttpHeaders.Values.GZIP);
+			request.headers().set(HttpHeaders.Names.CONTENT_LENGTH, request.content().readableBytes());
 
+			System.out.println(" readable bytes {}" + request.content().readableBytes());
+			l.info(" readable bytes {}", request.content().readableBytes());
 			// Set some example cookies.
-			request.headers().set(HttpHeaders.Names.COOKIE, ClientCookieEncoder.encode(new DefaultCookie("my-cookie", "foo"), new DefaultCookie("another-cookie", "bar")));
+			request.headers().set(HttpHeaders.Names.COOKIE, ClientCookieEncoder.encode(new DefaultCookie("userId", "ahanda"), new DefaultCookie("sessStart", "kal")));
 
 			// Send the HTTP request.
 			ch.writeAndFlush(request);
 
 			// Wait for the server to close the connection.
 			ch.closeFuture().sync();
-			System.out.println("Closing Client side Connection !!!");
+			l.info("Closing Client side Connection !!!");
 		}
 		finally
 		{
