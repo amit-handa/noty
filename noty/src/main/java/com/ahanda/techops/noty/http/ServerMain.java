@@ -1,7 +1,4 @@
-package com.ahanda.techops.noty.server;
-
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+package com.ahanda.techops.noty.http;
 
 import io.netty.bootstrap.ServerBootstrap;
 import io.netty.channel.ChannelFuture;
@@ -14,13 +11,14 @@ import io.netty.channel.socket.SocketChannel;
 import io.netty.channel.socket.nio.NioServerSocketChannel;
 import io.netty.handler.codec.http.HttpObjectAggregator;
 import io.netty.handler.codec.http.HttpRequestDecoder;
-import io.netty.handler.codec.http.HttpRequestEncoder;
 import io.netty.handler.codec.http.HttpResponseEncoder;
-import io.netty.handler.codec.http.HttpServerCodec;
+import io.netty.util.concurrent.DefaultEventExecutorGroup;
 
-import com.ahanda.techops.noty.msg.MqttMessageDecoder;
-import com.ahanda.techops.noty.msg.MqttMessageEncoder;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import com.ahanda.techops.noty.db.MongoDBManager;
+import com.ahanda.techops.noty.http.exception.DefaultExceptionHandler;
 
 /**
  * Discards any incoming data.
@@ -38,27 +36,30 @@ public class ServerMain
 
 	public void run() throws Exception
 	{
-		EventLoopGroup workers = new NioEventLoopGroup();
+		final DefaultEventExecutorGroup group = new DefaultEventExecutorGroup(100);
+		EventLoopGroup bossGroup = new NioEventLoopGroup();
+		EventLoopGroup workerGroup = new NioEventLoopGroup();
 		try
 		{
 			MongoDBManager.getInstance();
 			ServerBootstrap b = new ServerBootstrap(); // (2)
-			b.group(workers).channel(NioServerSocketChannel.class) // (3)
+			b.group(bossGroup, workerGroup).channel(NioServerSocketChannel.class) // (3)
 					.childHandler(new ChannelInitializer<SocketChannel>()
 					{
 						@Override
 						public void initChannel(SocketChannel ch) throws Exception
 						{
 							ChannelPipeline chp = ch.pipeline();
-							chp.addLast( new HttpServerCodec() );
-							//chp.addLast("decoder", new HttpRequestDecoder());
-							//chp.addLast("encoder", new HttpResponseEncoder());
+							chp.addLast("decoder", new HttpRequestDecoder());
 							chp.addLast("aggregator", new HttpObjectAggregator(1048576));
-							chp.addLast("handler", new ServerHandler());
+							chp.addLast("pintRequestDecoder", new RequestDecoder());
+							chp.addLast("encoder", new HttpResponseEncoder());
+							chp.addLast("httpPayloadEncoder", new ResponseEncoder());
+							chp.addLast("httpPayloadDecoder", new ServerHandler(group));
+							chp.addLast("httpExceptionHandler", new DefaultExceptionHandler());
 						}
 					}).option(ChannelOption.SO_BACKLOG, 128) // (5)
 					.childOption(ChannelOption.SO_KEEPALIVE, true); // (6)
-
 			l.info("Created server on port {}", port);
 
 			// Bind and start to accept incoming connections.
@@ -75,7 +76,8 @@ public class ServerMain
 		}
 		finally
 		{
-			workers.shutdownGracefully();
+			bossGroup.shutdownGracefully();
+			workerGroup.shutdownGracefully();
 		}
 	}
 

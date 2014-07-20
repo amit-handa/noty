@@ -1,8 +1,10 @@
 package com.ahanda.techops.noty.db;
 
 import java.net.UnknownHostException;
+import java.util.ArrayList;
 import java.util.List;
 
+import org.json.JSONArray;
 import org.json.JSONObject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -81,7 +83,8 @@ public class MongoDBManager
 			new BasicDBObject("source", 1).append("etime", 1) );
 		DBObject dbObject = (DBObject) JSON.parse(event);
 		WriteResult wr = events.insert(dbObject);
-		wr.getN();
+		int n = wr.getN();
+		System.out.println("Event : " + event + " ,inserted. Rows efected : " + n);
 	}
 
 	public void getEvent(JSONObject event)
@@ -89,14 +92,41 @@ public class MongoDBManager
 
 	}
 
+	public String getEvent(String source)
+	{
+		DBCollection events = eventsDB.getCollection(NotyConstants.EVENTS_COLLECTION);
+		BasicDBObject query = new BasicDBObject();
+		query.put("source", source);
+		DBObject result = events.findOne(query);
+		if (result == null)
+		{
+			return null;
+		}
+		result.removeField("_id");
+		String event = result.toString();
+		System.out.println("Returning : " + event);
+		return result.toString();
+	}
+
 	public static void main(String[] args) throws UnknownHostException
 	{
+		testGet();
+	}
+
+	private static void testGet() throws UnknownHostException
+	{
 		MongoDBManager mgr = getInstance();
-		//String j1 = "{'database' : 'mkyongDB','table' : 'hosting'," + "'detail' : {'records' : 99, 'index' : 'vps_index1', 'active' : 'true'}}}";
+		String event = mgr.getEvent("TOPAZ.PROD");
+		System.out.println(event);
+	}
+
+	public static void testInsert() throws UnknownHostException
+	{
+		MongoDBManager mgr = getInstance();
 		String j2 = "{'source':'TOPAZ.PROD','etime':'2014-06-27 06:17:57.878','message':'Apache Camel 2.12.1 starting','id':'org.apache.camel.main.MainSupport','status':'START','etype':'initialization'}";
-		//JSONObject o1 = new JSONObject(j1);
+		// JSONObject o1 = new JSONObject(j1);
 		JSONObject o2 = new JSONObject(j2);
-		//mgr.insertEvent(o1);
+		// mgr.insertEvent(o1);
 		mgr.insertEvent(o2);
 		List<DBObject> list = mgr.eventsDB.getCollection(NotyConstants.EVENTS_COLLECTION).getIndexInfo();
 
@@ -104,5 +134,21 @@ public class MongoDBManager
 		{
 			System.out.println(o.get("key"));
 		}
+	}
+
+	public void insertEvent(JSONArray eventList)
+	{
+		int count = eventList.length();
+		DBCollection events = eventsDB.getCollection(NotyConstants.EVENTS_COLLECTION);
+		events.createIndex(new BasicDBObject("source", 1));
+		events.createIndex(new BasicDBObject("etime", 1));
+		List<DBObject> list = new ArrayList<>(count);
+		for (int i = 0; i < count; i++)
+		{
+			DBObject dbObject = (DBObject) JSON.parse(eventList.getJSONObject(i).toString());
+			list.add(dbObject);
+		}
+		WriteResult wr = events.insert(list);
+		System.out.println("Bulk insert rows affected : " + wr.getN());
 	}
 }
