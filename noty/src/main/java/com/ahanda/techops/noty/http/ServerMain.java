@@ -1,4 +1,4 @@
-package com.ahanda.techops.noty.server;
+package com.ahanda.techops.noty.http;
 
 import io.netty.bootstrap.ServerBootstrap;
 import io.netty.channel.ChannelFuture;
@@ -18,6 +18,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.ahanda.techops.noty.db.MongoDBManager;
+import com.ahanda.techops.noty.http.exception.DefaultExceptionHandler;
 
 /**
  * Discards any incoming data.
@@ -36,23 +37,26 @@ public class ServerMain
 	public void run() throws Exception
 	{
 		final DefaultEventExecutorGroup group = new DefaultEventExecutorGroup(100);
-		EventLoopGroup workers = new NioEventLoopGroup();
+		EventLoopGroup bossGroup = new NioEventLoopGroup();
+		EventLoopGroup workerGroup = new NioEventLoopGroup();
 		try
 		{
 			MongoDBManager.getInstance();
 			ServerBootstrap b = new ServerBootstrap(); // (2)
-			b.group(workers).channel(NioServerSocketChannel.class) // (3)
+			b.group(bossGroup, workerGroup).channel(NioServerSocketChannel.class) // (3)
 					.childHandler(new ChannelInitializer<SocketChannel>()
 					{
 						@Override
 						public void initChannel(SocketChannel ch) throws Exception
 						{
 							ChannelPipeline chp = ch.pipeline();
-							// chp.addLast( new HttpServerCodec() );
 							chp.addLast("decoder", new HttpRequestDecoder());
-							chp.addLast("encoder", new HttpResponseEncoder());
 							chp.addLast("aggregator", new HttpObjectAggregator(1048576));
-							chp.addLast(group,new ServerHandler());
+							chp.addLast("pintRequestDecoder", new RequestDecoder());
+							chp.addLast("encoder", new HttpResponseEncoder());
+							chp.addLast("httpPayloadEncoder", new ResponseEncoder());
+							chp.addLast("httpPayloadDecoder", new ServerHandler(group));
+							chp.addLast("httpExceptionHandler", new DefaultExceptionHandler());
 						}
 					}).option(ChannelOption.SO_BACKLOG, 128) // (5)
 					.childOption(ChannelOption.SO_KEEPALIVE, true); // (6)
@@ -72,7 +76,8 @@ public class ServerMain
 		}
 		finally
 		{
-			workers.shutdownGracefully();
+			bossGroup.shutdownGracefully();
+			workerGroup.shutdownGracefully();
 		}
 	}
 

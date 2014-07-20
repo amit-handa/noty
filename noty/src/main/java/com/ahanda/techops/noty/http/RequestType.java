@@ -1,4 +1,4 @@
-package com.ahanda.techops.noty.pojo;
+package com.ahanda.techops.noty.http;
 
 public enum RequestType
 {
