@@ -30,6 +30,7 @@ import io.netty.handler.codec.http.FullHttpRequest;
 import io.netty.handler.codec.http.HttpClientCodec;
 import io.netty.handler.codec.http.HttpHeaders;
 import io.netty.handler.codec.http.HttpMethod;
+import io.netty.handler.codec.http.HttpObjectAggregator;
 import io.netty.handler.codec.http.HttpRequest;
 import io.netty.handler.codec.http.HttpRequestDecoder;
 import io.netty.handler.codec.http.HttpRequestEncoder;
@@ -110,7 +111,7 @@ public final class Client
 					// p.addLast(new HttpContentDecompressor());
 
 					// Uncomment the following line if you don't want to handle HttpContents.
-					// p.addLast(new HttpObjectAggregator(1048576));
+					p.addLast(new HttpObjectAggregator(1048576));
 
 					p.addLast(new ClientHandler());
 				}
@@ -119,27 +120,7 @@ public final class Client
 			// Make the connection attempt.
 			Channel ch = b.connect(host, port).sync().channel();
 
-			// Prepare the HTTP request.
-			JSONObject e = new JSONObject().put("id", "Ping").put("type", "SecSyncer").put("source", "PROD.Topaz").put("etime", System.currentTimeMillis() / 1000L)
-					.put("status", "OK").put("message", "Up Since last 15 minutes");
-
-			StringWriter estr = new StringWriter();
-			e.write(estr);
-			String contentStr = estr.toString();
-			FullHttpRequest request = new DefaultFullHttpRequest(HttpVersion.HTTP_1_1, HttpMethod.POST, uri.getRawPath(), ch.alloc().buffer().writeBytes(contentStr.getBytes()));
-
-			request.headers().set(HttpHeaders.Names.HOST, host);
-			request.headers().set(HttpHeaders.Names.CONNECTION, HttpHeaders.Values.CLOSE);
-			request.headers().set(HttpHeaders.Names.ACCEPT_ENCODING, HttpHeaders.Values.GZIP);
-			request.headers().set(HttpHeaders.Names.CONTENT_LENGTH, request.content().readableBytes());
-
-			System.out.println(" readable bytes {}" + request.content().readableBytes());
-			l.info(" readable bytes {}", request.content().readableBytes());
-			// Set some example cookies.
-			request.headers().set(HttpHeaders.Names.COOKIE, ClientCookieEncoder.encode(new DefaultCookie("userId", "ahanda"), new DefaultCookie("sessStart", "kal")));
-
-			// Send the HTTP request.
-			ch.writeAndFlush(request);
+			ClientHandler.init( ch );
 
 			// Wait for the server to close the connection.
 			ch.closeFuture().sync();

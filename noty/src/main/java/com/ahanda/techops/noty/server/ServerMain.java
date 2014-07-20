@@ -50,9 +50,9 @@ public class ServerMain
 						public void initChannel(SocketChannel ch) throws Exception
 						{
 							ChannelPipeline chp = ch.pipeline();
-							// chp.addLast( new HttpServerCodec() );
-							chp.addLast("decoder", new HttpRequestDecoder());
-							chp.addLast("encoder", new HttpResponseEncoder());
+							chp.addLast( new HttpServerCodec() );
+							//chp.addLast("decoder", new HttpRequestDecoder());
+							//chp.addLast("encoder", new HttpResponseEncoder());
 							chp.addLast("aggregator", new HttpObjectAggregator(1048576));
 							chp.addLast("handler", new ServerHandler());
 						}

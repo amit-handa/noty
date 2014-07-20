@@ -26,15 +26,19 @@ import io.netty.handler.codec.DecoderResult;
 import io.netty.handler.codec.http.Cookie;
 import io.netty.handler.codec.http.CookieDecoder;
 import io.netty.handler.codec.http.DefaultFullHttpResponse;
+import io.netty.handler.codec.http.DefaultHttpResponse;
 import io.netty.handler.codec.http.FullHttpMessage;
 import io.netty.handler.codec.http.FullHttpRequest;
 import io.netty.handler.codec.http.FullHttpResponse;
 import io.netty.handler.codec.http.HttpContent;
 import io.netty.handler.codec.http.HttpHeaders;
 import io.netty.handler.codec.http.HttpMessage;
+import io.netty.handler.codec.http.HttpMethod;
 import io.netty.handler.codec.http.HttpObject;
 import io.netty.handler.codec.http.HttpRequest;
 import io.netty.handler.codec.http.HttpResponse;
+import io.netty.handler.codec.http.HttpResponseStatus;
+import io.netty.handler.codec.http.HttpVersion;
 import io.netty.handler.codec.http.LastHttpContent;
 import io.netty.handler.codec.http.QueryStringDecoder;
 import io.netty.handler.codec.http.ServerCookieEncoder;
@@ -45,8 +49,12 @@ import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
 
+import org.json.JSONArray;
+import org.json.JSONObject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import com.ahanda.techops.noty.db.MongoDBManager;
 
 import static io.netty.handler.codec.http.HttpHeaders.Names.*;
 import static io.netty.handler.codec.http.HttpResponseStatus.*;
@@ -61,13 +69,25 @@ public class ServerHandler extends SimpleChannelInboundHandler<FullHttpRequest>
 
 	/** Buffer that stores the response content */
 	private final StringBuilder buf = new StringBuilder();
+	String userId;
+	boolean authorized;
+	MongoDBManager dbMgr;
+	
+	// response messages
+	String unauthAccessMsg = "Kindly login before accessing the resource";
+	DefaultFullHttpResponse unauthAccess = new DefaultFullHttpResponse( HttpVersion.HTTP_1_1, HttpResponseStatus.NETWORK_AUTHENTICATION_REQUIRED, Unpooled.buffer().writeBytes( unauthAccessMsg.getBytes() ) );
 
 	static final Logger l = LoggerFactory.getLogger(ServerHandler.class);
+
+	{
+		unauthAccess.headers().set(HttpHeaders.Names.CONTENT_LENGTH, unauthAccess.content().readableBytes() );
+	}
 
 	@Override
 	public void channelReadComplete(ChannelHandlerContext ctx)
 	{
 		ctx.flush();
+		l.info("channel read complete");
 
 		/*
 		 * ByteBuf fullcontent = content.copy( 0, content.capacity() ); content.release();
@@ -83,11 +103,48 @@ public class ServerHandler extends SimpleChannelInboundHandler<FullHttpRequest>
 	 * void reset() { req = null; content = null; last = false; }
 	 */
 
+	FullHttpResponse handleRequest( ChannelHandlerContext ctx, FullHttpRequest req ) {
+		QueryStringDecoder resource = new QueryStringDecoder( req.getUri() );
+        String contentStr = req.content().toString(CharsetUtil.UTF_8);
+
+		if( resource.path().equals( "/login" ) ) {
+			JSONObject content = new JSONObject( contentStr );
+			userId = content.getString( "userId" );
+			authorized = true;
+		}
+
+		if( !authorized ) {
+			return unauthAccess;
+		}
+
+		try {
+			dbMgr = MongoDBManager.getInstance();
+		} catch( Exception e ) {
+			l.error( "Could not get DB Manager {} {}", e.getStackTrace(), e.getMessage() );
+		}
+		if( resource.path().equals( "/events" ) ) { 
+			if( req.getMethod() == HttpMethod.POST ) {
+				JSONArray events = new JSONArray( contentStr );
+				for( int i = 0, size = events.length(); i < size; i++ ) {
+					dbMgr.insertEvent( events.getJSONObject(i) );
+					l.info( "Handled event publish !! {}", events.getJSONObject( i ) );
+				}
+			} else {	// get events
+				JSONObject dbquery = new JSONObject( contentStr );
+			}
+		}
+		return null;
+	}
+
 	@Override
 	protected void channelRead0(ChannelHandlerContext ctx, FullHttpRequest msg)
 	{
 		assert msg instanceof LastHttpContent;
 		l.info("received request ! {} {}", msg, msg.content().toString(CharsetUtil.UTF_8));
+
+		FullHttpResponse resp = handleRequest( ctx, msg );
+		ctx.writeAndFlush( resp );
+
 		/*
 		 * if( msg instanceof HttpMessage ) { if( req != null ) l.error( "request is already assigned !!!!!!");
 		 * 

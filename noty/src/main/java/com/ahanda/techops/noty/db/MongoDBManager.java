@@ -4,6 +4,8 @@ import java.net.UnknownHostException;
 import java.util.List;
 
 import org.json.JSONObject;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import com.ahanda.techops.noty.NotyConstants;
 import com.fasterxml.jackson.databind.jsonFormatVisitors.JsonObjectFormatVisitor;
@@ -17,7 +19,9 @@ import com.mongodb.util.JSON;
 
 public class MongoDBManager
 {
-	private static final String eventsDBName = "eventsDB";
+	static final Logger l = LoggerFactory.getLogger( MongoDBManager.class );
+
+	private static final String eventsDBName = "events";
 
 	private static final String host = "localhost";
 
@@ -28,6 +32,7 @@ public class MongoDBManager
 	private DB eventsDB;
 
 	private static MongoDBManager instance;
+	static JSONObject config;
 
 	/*
 	 * This is for unit testing
@@ -38,20 +43,30 @@ public class MongoDBManager
 		{
 			synchronized (MongoDBManager.class)
 			{
+				setConfig( null );
 				if (instance == null)
 				{
-					instance = new MongoDBManager();
+					instance = new MongoDBManager( config );
 				}
 			}
 		}
 		return instance;
 	}
 
-	private MongoDBManager() throws UnknownHostException
+	public static void setConfig( JSONObject config ) {
+		if( config == null ) {
+			config = new JSONObject().put( "host", host ) 
+					.put( "port", port )
+					.put( "events", eventsDBName );
+		}
+		MongoDBManager.config = config;
+	}
+
+	private MongoDBManager( JSONObject config ) throws UnknownHostException
 	{
-		mongoClient = new MongoClient(host, port);
-		eventsDB = mongoClient.getDB(eventsDBName);
-		System.out.println("Events DB not null : " + eventsDB != null ? true : false);
+		mongoClient = new MongoClient( config.getString( "host"), config.getInt( "port") );
+		eventsDB = mongoClient.getDB( config.getString( "events" ) );
+		l.info("Events DB non-null : {}", eventsDB != null ? true : false);
 	}
 
 	public void insertEvent(JSONObject event)
@@ -62,8 +77,8 @@ public class MongoDBManager
 	public void insertEvent(String event)
 	{
 		DBCollection events = eventsDB.getCollection(NotyConstants.EVENTS_COLLECTION);
-		events.createIndex(new BasicDBObject("source", 1));
-		events.createIndex(new BasicDBObject("etime", 1));
+		events.createIndex(
+			new BasicDBObject("source", 1).append("etime", 1) );
 		DBObject dbObject = (DBObject) JSON.parse(event);
 		WriteResult wr = events.insert(dbObject);
 		wr.getN();
