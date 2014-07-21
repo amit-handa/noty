@@ -62,108 +62,69 @@ public class ServerHandler extends SimpleChannelInboundHandler<Request>
 	protected void channelRead0(final ChannelHandlerContext ctx, final Request request) throws IOException, InstantiationException, IllegalAccessException
 	{
 		FullHttpRequest httpRequest = request.getHttpRequest();
-		String path = getPath(request);
-		System.out.println(path);
-		if (path.contains("/publish"))
+        String path = getPath(request);
+		l.debug( "Received request for {} {}", path, httpRequest.getUri());
+		if (httpRequest.getMethod() != POST || !httpRequest.headers().contains("Content-type", "application/json", true))
+        {
+			sendBadRequest(ctx, request);
+			return;
+        }
+
+		l.info( "Received request for {}", path);
+		if (path.equals("/events"))
 		{
-			if (httpRequest.getMethod() != POST || !httpRequest.headers().contains("Content-type", "application/json", true))
-			{
-				sendBadRequest(ctx, request);
-				return;
-			}
-			else
-			{
-				String jsonString = httpRequest.content().toString(CharsetUtil.UTF_8);
-				final JSONArray eventList;
-				try
-				{
-					eventList = new JSONArray(jsonString);
-				}
-				catch (JSONException e)
-				{
-					return;
-				}
-				Future<Boolean> future = executor.submit(new Callable<Boolean>()
-				{
-					@Override
-					public Boolean call() throws Exception
-					{
-						try
-						{
-							MongoDBManager.getInstance().insertEvent(eventList);
-							return true;
-						}
-						catch (Exception e)
-						{
-							return false;
-						}
-					}
-				});
-				future.addListener(new GenericFutureListener<Future<Boolean>>()
-				{
-					@Override
-					public void operationComplete(Future<Boolean> future) throws Exception
-					{
-						boolean insertSuccess = future.get();
-						if (future.isSuccess() && insertSuccess)
-						{
-							// Build the response object
-							FullHttpResponse httpResponse = new DefaultFullHttpResponse(HTTP_1_1, OK);
-							FullEncodedResponse encodedResponse = new FullEncodedResponse(request, httpResponse);
-							ctx.writeAndFlush(encodedResponse);
-						}
-						else
-						{
-							ctx.fireExceptionCaught(future.cause());
-						}
-					}
-				});
-				return;
-			}
+                String jsonString = httpRequest.content().toString(CharsetUtil.UTF_8);
+                final JSONArray eventList;
+                try
+                {
+                        eventList = new JSONArray(jsonString);
+                }
+                catch (JSONException e)
+                {
+                        ctx.fireExceptionCaught( e );
+                        return;
+                }
+                Future<Boolean> future = executor.submit(new Callable<Boolean>()
+                {
+                        @Override
+                        public Boolean call() throws Exception
+                        {
+                                try
+                                {
+                                        MongoDBManager.getInstance().insertEvent(eventList);
+                                        return true;
+                                }
+                                catch (Exception e)
+                                {
+                                        l.info( "Error while inserting events!" );
+                                        return false;
+                                }
+                        }
+                });
+                future.addListener(new GenericFutureListener<Future<Boolean>>()
+                {
+                        @Override
+                        public void operationComplete(Future<Boolean> future) throws Exception
+                        {
+                                boolean insertSuccess = future.get();
+                                if (future.isSuccess() && insertSuccess)
+                                {
+                                        // Build the response object
+                                        FullHttpResponse httpResponse = new DefaultFullHttpResponse(HTTP_1_1, OK);
+                                        FullEncodedResponse encodedResponse = new FullEncodedResponse(request, httpResponse);
+                                        ctx.writeAndFlush(encodedResponse);
+                                }
+                                else
+                                {
+                                        ctx.fireExceptionCaught(future.cause());
+                                }
+                        }
+                });
+                return;
 		}
-		else if (path.contains("/getEvent"))
+		else if (path.equals("/events/search"))
 		{
-			Values values = new Values();
-			Map<String, List<String>> requestParameters;
-
-			QueryStringDecoder queryStringDecoder = new QueryStringDecoder(httpRequest.getUri());
-			requestParameters = queryStringDecoder.parameters();
-
-			if (httpRequest.getMethod() == POST)
-			{
-				// Add POST parameters
-				HttpPostRequestDecoder decoder = new HttpPostRequestDecoder(new DefaultHttpDataFactory(false), httpRequest);
-				try
-				{
-					while (decoder.hasNext())
-					{
-						InterfaceHttpData httpData = decoder.next();
-						if (httpData.getHttpDataType() == HttpDataType.Attribute)
-						{
-							Attribute attribute = (Attribute) httpData;
-							String attrName = attribute.getName();
-							String attrValue = attribute.getValue();
-							System.out.println("AttrName : " + attrName + " ,attrValue : " + attrValue);
-							if (!requestParameters.containsKey(attribute.getName()))
-							{
-								values.put(attrName, attrValue);
-							}
-							// requestParameters.get(attribute.getName()).add(attribute.getValue());
-							attribute.release();
-						}
-					}
-				}
-				catch (HttpPostRequestDecoder.EndOfDataDecoderException ex)
-				{
-					// Exception when the body is fully decoded, even if there
-					// is still data
-				}
-
-				decoder.destroy();
-			}
-
-			handleRequestParams(requestParameters, values);
-			final String source = values.getAsString("source");
+			final JSONObject query = new JSONObject( httpRequest.content().toString( CharsetUtil.UTF_8 ) );
 			Future<String> future = executor.submit(new Callable<String>()
 			{
 				@Override
@@ -171,7 +132,7 @@ public class ServerHandler extends SimpleChannelInboundHandler<Request>
 				{
 					try
 					{
-						return MongoDBManager.getInstance().getEvent(source);
+						return MongoDBManager.getInstance().getEvent( query );
 					}
 					catch (Exception e)
 					{
@@ -190,7 +151,6 @@ public class ServerHandler extends SimpleChannelInboundHandler<Request>
 						// Build the response object
 						FullHttpResponse httpResponse = new DefaultFullHttpResponse(HTTP_1_1, OK, Unpooled.copiedBuffer(event, CharsetUtil.UTF_8));
 						httpResponse.headers().set(CONTENT_TYPE, "application/json");
-						httpResponse.headers().set(CONTENT_LENGTH, httpResponse.content().readableBytes());
 						FullEncodedResponse encodedResponse = new FullEncodedResponse(request, httpResponse);
 						ctx.writeAndFlush(encodedResponse);
 					}

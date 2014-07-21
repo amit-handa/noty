@@ -17,6 +17,7 @@ package com.ahanda.techops.noty.clientTest;
 
 import java.io.StringWriter;
 
+import org.json.JSONArray;
 import org.json.JSONObject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -28,6 +29,7 @@ import io.netty.handler.codec.http.ClientCookieEncoder;
 import io.netty.handler.codec.http.DefaultCookie;
 import io.netty.handler.codec.http.DefaultFullHttpRequest;
 import io.netty.handler.codec.http.FullHttpRequest;
+import io.netty.handler.codec.http.FullHttpResponse;
 import io.netty.handler.codec.http.HttpContent;
 import io.netty.handler.codec.http.HttpHeaders;
 import io.netty.handler.codec.http.HttpMethod;
@@ -40,26 +42,54 @@ import io.netty.util.CharsetUtil;
 public class ClientHandler extends SimpleChannelInboundHandler<HttpObject>
 {
 	static final Logger l = LoggerFactory.getLogger(ClientHandler.class );
+	static JSONObject event = new JSONObject().put("id", "Ping").put("type", "SecSyncer").put("source", "PROD.Topaz").put("etime", System.currentTimeMillis() / 1000L)
+        .put("status", "OK").put("message", "Up Since last 15 minutes");
+	int state = 0;	// 0 -> pub event, 1 -> getevent
 
-	public static void init( Channel ch ) {
+	static JSONObject getEvents = new JSONObject().put( "source", "PROD.Topaz" );
+
+	private void getEvents(Channel ch) {
+        StringWriter estr = new StringWriter();
+        getEvents.write(estr);
+        String contentStr = estr.toString();
+
+        FullHttpRequest request = new DefaultFullHttpRequest(HttpVersion.HTTP_1_1, HttpMethod.POST,
+        		"/events/search", ch.alloc().buffer().writeBytes(contentStr.getBytes()));
+
+        request.headers().set(HttpHeaders.Names.CONNECTION, HttpHeaders.Values.KEEP_ALIVE);
+        request.headers().set(HttpHeaders.Names.ACCEPT_ENCODING, HttpHeaders.Values.GZIP);
+        request.headers().set(HttpHeaders.Names.CONTENT_TYPE, "application/json" );
+
+        request.headers().set(HttpHeaders.Names.CONTENT_LENGTH, request.content().readableBytes());
+        // Set some example cookies.
+        request.headers().set(HttpHeaders.Names.COOKIE, ClientCookieEncoder.encode(new DefaultCookie("userId", "ahanda"), new DefaultCookie("sessStart", "kal")));
+
+        l.info("getevents bytes {}", request.content().readableBytes());
+
+        // Send the HTTP request.
+        ch.writeAndFlush(request);
+	}
+
+	public static void pubEvent( Channel ch, JSONObject e ) {
         // Prepare the HTTP request.
-        JSONObject e = new JSONObject().put("id", "Ping").put("type", "SecSyncer").put("source", "PROD.Topaz").put("etime", System.currentTimeMillis() / 1000L)
-                        .put("status", "OK").put("message", "Up Since last 15 minutes");
+        JSONArray es = new JSONArray();
+        es.put( e );
 
         StringWriter estr = new StringWriter();
-        e.write(estr);
+        es.write(estr);
         String contentStr = estr.toString();
         FullHttpRequest request = new DefaultFullHttpRequest(HttpVersion.HTTP_1_1, HttpMethod.POST,
         		"/events", ch.alloc().buffer().writeBytes(contentStr.getBytes()));
 
-        request.headers().set(HttpHeaders.Names.CONNECTION, HttpHeaders.Values.CLOSE);
+        request.headers().set(HttpHeaders.Names.CONNECTION, HttpHeaders.Values.KEEP_ALIVE);
         request.headers().set(HttpHeaders.Names.ACCEPT_ENCODING, HttpHeaders.Values.GZIP);
-        request.headers().set(HttpHeaders.Names.CONTENT_LENGTH, request.content().readableBytes());
+        request.headers().set(HttpHeaders.Names.CONTENT_TYPE, "application/json" );
 
-        System.out.println(" readable bytes {}" + request.content().readableBytes());
-        l.info(" readable bytes {}", request.content().readableBytes());
+        request.headers().set(HttpHeaders.Names.CONTENT_LENGTH, request.content().readableBytes());
         // Set some example cookies.
         request.headers().set(HttpHeaders.Names.COOKIE, ClientCookieEncoder.encode(new DefaultCookie("userId", "ahanda"), new DefaultCookie("sessStart", "kal")));
+
+        l.info("readable bytes {}", request.content().readableBytes());
 
         // Send the HTTP request.
         ch.writeAndFlush(request);
@@ -68,6 +98,10 @@ public class ClientHandler extends SimpleChannelInboundHandler<HttpObject>
 	@Override
 	public void channelRead0(ChannelHandlerContext ctx, HttpObject msg)
 	{
+		assert msg instanceof FullHttpResponse;
+		l.info( " Got a message from server !!! {}", msg);
+		++state;
+		
 		if (msg instanceof HttpResponse)
 		{
 			HttpResponse response = (HttpResponse) msg;
@@ -109,6 +143,10 @@ public class ClientHandler extends SimpleChannelInboundHandler<HttpObject>
 				System.out.println("} END OF CONTENT");
 				ctx.close();
 			}
+		}
+		
+		if( state == 1 ) {
+			getEvents( ctx.channel() );
 		}
 	}
 

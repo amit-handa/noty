@@ -51,9 +51,9 @@ public class ServerMain
 						{
 							ChannelPipeline chp = ch.pipeline();
 							chp.addLast("decoder", new HttpRequestDecoder());
+							chp.addLast("encoder", new HttpResponseEncoder());
 							chp.addLast("aggregator", new HttpObjectAggregator(1048576));
 							chp.addLast("pintRequestDecoder", new RequestDecoder());
-							chp.addLast("encoder", new HttpResponseEncoder());
 							chp.addLast("httpPayloadEncoder", new ResponseEncoder());
 							chp.addLast("httpPayloadDecoder", new ServerHandler(group));
 							chp.addLast("httpExceptionHandler", new DefaultExceptionHandler());

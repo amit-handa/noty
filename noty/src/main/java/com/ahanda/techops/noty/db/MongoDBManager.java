@@ -23,15 +23,16 @@ public class MongoDBManager
 {
 	static final Logger l = LoggerFactory.getLogger( MongoDBManager.class );
 
-	private static final String eventsDBName = "events";
+	private static final String pintDBName = "pint";
+	private static final String eventsColl = "events";
 
-	private static final String host = "localhost";
+	private static final String host = "192.168.1.18";
 
 	private static final int port = 27017;
 
 	private MongoClient mongoClient;
 
-	private DB eventsDB;
+	private DB pintDB;
 
 	private static MongoDBManager instance;
 	static JSONObject config;
@@ -59,7 +60,8 @@ public class MongoDBManager
 		if( config == null ) {
 			config = new JSONObject().put( "host", host ) 
 					.put( "port", port )
-					.put( "events", eventsDBName );
+					.put( "events", eventsColl )
+					.put( "pintDB", pintDBName );
 		}
 		MongoDBManager.config = config;
 	}
@@ -67,8 +69,8 @@ public class MongoDBManager
 	private MongoDBManager( JSONObject config ) throws UnknownHostException
 	{
 		mongoClient = new MongoClient( config.getString( "host"), config.getInt( "port") );
-		eventsDB = mongoClient.getDB( config.getString( "events" ) );
-		l.info("Events DB non-null : {}", eventsDB != null ? true : false);
+		pintDB = mongoClient.getDB( config.getString( "pintDB" ) );
+		l.info("Events DB non-null : {}", pintDB != null ? true : false);
 	}
 
 	public void insertEvent(JSONObject event)
@@ -78,33 +80,30 @@ public class MongoDBManager
 
 	public void insertEvent(String event)
 	{
-		DBCollection events = eventsDB.getCollection(NotyConstants.EVENTS_COLLECTION);
+		DBCollection events = pintDB.getCollection( config.getString( "events") );
 		events.createIndex(
-			new BasicDBObject("source", 1).append("etime", 1) );
+			new BasicDBObject("source", 1).append("etime", 2) );
 		DBObject dbObject = (DBObject) JSON.parse(event);
 		WriteResult wr = events.insert(dbObject);
 		int n = wr.getN();
-		System.out.println("Event : " + event + " ,inserted. Rows efected : " + n);
+		l.info("Event : {} inserted. Rows efected : {}", events, n);
 	}
 
-	public void getEvent(JSONObject event)
+	public String getEvent( JSONObject query )
 	{
+		DBCollection events = pintDB.getCollection( config.getString( "events" ) );
 
-	}
-
-	public String getEvent(String source)
-	{
-		DBCollection events = eventsDB.getCollection(NotyConstants.EVENTS_COLLECTION);
-		BasicDBObject query = new BasicDBObject();
-		query.put("source", source);
-		DBObject result = events.findOne(query);
+		DBObject dbquery = (DBObject)JSON.parse( query.toString() );
+		DBObject result = events.findOne(dbquery);
 		if (result == null)
 		{
 			return null;
 		}
 		result.removeField("_id");
+
 		String event = result.toString();
-		System.out.println("Returning : " + event);
+
+		l.info("Returning : {}", event);
 		return result.toString();
 	}
 
@@ -116,7 +115,7 @@ public class MongoDBManager
 	private static void testGet() throws UnknownHostException
 	{
 		MongoDBManager mgr = getInstance();
-		String event = mgr.getEvent("TOPAZ.PROD");
+		String event = mgr.getEvent( new JSONObject().put( "source", "TOPAZ.PROD" ) );
 		System.out.println(event);
 	}
 
@@ -128,7 +127,7 @@ public class MongoDBManager
 		JSONObject o2 = new JSONObject(j2);
 		// mgr.insertEvent(o1);
 		mgr.insertEvent(o2);
-		List<DBObject> list = mgr.eventsDB.getCollection(NotyConstants.EVENTS_COLLECTION).getIndexInfo();
+		List<DBObject> list = mgr.pintDB.getCollection( config.getString( "events" )).getIndexInfo();
 
 		for (DBObject o : list)
 		{
@@ -139,9 +138,8 @@ public class MongoDBManager
 	public void insertEvent(JSONArray eventList)
 	{
 		int count = eventList.length();
-		DBCollection events = eventsDB.getCollection(NotyConstants.EVENTS_COLLECTION);
-		events.createIndex(new BasicDBObject("source", 1));
-		events.createIndex(new BasicDBObject("etime", 1));
+		DBCollection events = pintDB.getCollection( config.getString( "events" ) );
+		events.createIndex(new BasicDBObject("source", 1).append("etime", 2));
 		List<DBObject> list = new ArrayList<>(count);
 		for (int i = 0; i < count; i++)
 		{

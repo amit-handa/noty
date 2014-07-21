@@ -1,5 +1,6 @@
 package com.ahanda.techops.noty.http.message;
 
+import io.netty.handler.codec.http.FullHttpResponse;
 import io.netty.handler.codec.http.HttpResponse;
 
 public class FullEncodedResponse
@@ -7,9 +8,9 @@ public class FullEncodedResponse
 
 	private final Request request;
 
-	private final HttpResponse httpResponse;
+	private final FullHttpResponse httpResponse;
 
-	public FullEncodedResponse(Request request, HttpResponse httpResponse)
+	public FullEncodedResponse(Request request, FullHttpResponse httpResponse)
 	{
 		this.request = request;
 		this.httpResponse = httpResponse;
@@ -20,7 +21,7 @@ public class FullEncodedResponse
 		return request;
 	}
 
-	public HttpResponse getHttpResponse()
+	public FullHttpResponse getHttpResponse()
 	{
 		return httpResponse;
 	}

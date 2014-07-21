@@ -51,7 +51,6 @@ import org.slf4j.LoggerFactory;
  */
 public final class Client
 {
-
 	static final String URL = System.getProperty("url", "http://127.0.0.1:8080/events");
 
 	static final Logger l = LoggerFactory.getLogger(Client.class);
@@ -120,7 +119,7 @@ public final class Client
 			// Make the connection attempt.
 			Channel ch = b.connect(host, port).sync().channel();
 
-			ClientHandler.init( ch );
+			ClientHandler.pubEvent( ch, ClientHandler.event );
 
 			// Wait for the server to close the connection.
 			ch.closeFuture().sync();

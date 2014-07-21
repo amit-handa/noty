@@ -9,6 +9,7 @@ import io.netty.channel.ChannelOutboundHandlerAdapter;
 import io.netty.channel.ChannelPromise;
 import io.netty.handler.codec.http.Cookie;
 import io.netty.handler.codec.http.CookieDecoder;
+import io.netty.handler.codec.http.FullHttpResponse;
 import io.netty.handler.codec.http.HttpHeaders;
 import io.netty.handler.codec.http.HttpRequest;
 import io.netty.handler.codec.http.HttpResponse;
@@ -44,8 +45,11 @@ public class ResponseEncoder extends ChannelOutboundHandlerAdapter
 		}
 
 		FullEncodedResponse encodedResponse = (FullEncodedResponse) msg;
-		HttpResponse httpResponse = encodedResponse.getHttpResponse();
+		FullHttpResponse httpResponse = encodedResponse.getHttpResponse();
 		HttpRequest httpRequest = encodedResponse.getRequest().getHttpRequest();
+		if( httpResponse.content() != null )
+			httpResponse.headers().set( HttpHeaders.Names.CONTENT_LENGTH, httpResponse.content().readableBytes() );
+		else httpResponse.headers().set( HttpHeaders.Names.CONTENT_LENGTH, 0 );
 
 		/*
 		 * String cookieString = httpRequest.headers().get(COOKIE); Boolean hasSessionId = false; if (cookieString != null) { Set<Cookie> cookies =
