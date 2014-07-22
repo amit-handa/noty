@@ -122,7 +122,7 @@ public class ServerHandler extends SimpleChannelInboundHandler<Request>
                 });
                 return;
 		}
-		else if (path.equals("/events/search"))
+		else if (path.equals("/events/find"))
 		{
 			final JSONObject query = new JSONObject( httpRequest.content().toString( CharsetUtil.UTF_8 ) );
 			Future<String> future = executor.submit(new Callable<String>()
