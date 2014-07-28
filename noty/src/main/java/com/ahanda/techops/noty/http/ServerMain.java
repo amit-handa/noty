@@ -1,5 +1,7 @@
 package com.ahanda.techops.noty.http;
 
+import java.net.URL;
+
 import io.netty.bootstrap.ServerBootstrap;
 import io.netty.channel.ChannelFuture;
 import io.netty.channel.ChannelInitializer;
@@ -19,6 +21,8 @@ import org.slf4j.LoggerFactory;
 
 import com.ahanda.techops.noty.db.MongoDBManager;
 import com.ahanda.techops.noty.http.exception.DefaultExceptionHandler;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 
 /**
  * Discards any incoming data.
@@ -34,13 +38,14 @@ public class ServerMain
 		this.port = port;
 	}
 
-	public void run() throws Exception
+	public void run(JsonNode conf) throws Exception
 	{
 		final DefaultEventExecutorGroup group = new DefaultEventExecutorGroup(100);
 		EventLoopGroup bossGroup = new NioEventLoopGroup();
 		EventLoopGroup workerGroup = new NioEventLoopGroup();
 		try
 		{
+			MongoDBManager.setConfig( conf );
 			MongoDBManager.getInstance();
 			ServerBootstrap b = new ServerBootstrap(); // (2)
 			b.group(bossGroup, workerGroup).channel(NioServerSocketChannel.class) // (3)
@@ -84,6 +89,7 @@ public class ServerMain
 	public static void main(String[] args) throws Exception
 	{
 		int port;
+		JsonNode conf = null;
 		if (args.length > 0)
 		{
 			port = Integer.parseInt(args[0]);
@@ -93,6 +99,12 @@ public class ServerMain
 			port = 8080;
 		}
 
-		new ServerMain(port).run();
+		if( args.length <= 1 ) {
+			throw new IllegalArgumentException();
+		}
+        ObjectMapper om = new ObjectMapper();
+        om.readTree( new URL( args[1] ));
+
+		new ServerMain(port).run( conf );
 	}
 }

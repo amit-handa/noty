@@ -10,7 +10,10 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.ahanda.techops.noty.NotyConstants;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.jsonFormatVisitors.JsonObjectFormatVisitor;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.mongodb.BasicDBObject;
 import com.mongodb.DB;
 import com.mongodb.DBCollection;
@@ -26,16 +29,18 @@ public class MongoDBManager
 	private static final String pintDBName = "pint";
 	private static final String eventsColl = "events";
 
-	private static final String host = "192.168.1.18";
+	private static final String host = "localhost";
 
 	private static final int port = 27017;
+
+	static ObjectMapper om = new ObjectMapper();
 
 	private MongoClient mongoClient;
 
 	private DB pintDB;
 
 	private static MongoDBManager instance;
-	static JSONObject config;
+	static JsonNode config;
 
 	/*
 	 * This is for unit testing
@@ -56,9 +61,10 @@ public class MongoDBManager
 		return instance;
 	}
 
-	public static void setConfig( JSONObject config ) {
+	public static void setConfig( JsonNode config ) {
 		if( config == null ) {
-			config = new JSONObject().put( "host", host ) 
+			config = om.createObjectNode()
+					.put( "host", host ) 
 					.put( "port", port )
 					.put( "events", eventsColl )
 					.put( "pintDB", pintDBName );
@@ -66,21 +72,21 @@ public class MongoDBManager
 		MongoDBManager.config = config;
 	}
 
-	private MongoDBManager( JSONObject config ) throws UnknownHostException
+	private MongoDBManager( JsonNode config ) throws UnknownHostException
 	{
-		mongoClient = new MongoClient( config.getString( "host"), config.getInt( "port") );
-		pintDB = mongoClient.getDB( config.getString( "pintDB" ) );
+		mongoClient = new MongoClient( config.get( "host").asText(), config.get( "port").asInt() );
+		pintDB = mongoClient.getDB( config.get( "pintDB" ).asText() );
 		l.info("Events DB non-null : {}", pintDB != null ? true : false);
 	}
 
-	public void insertEvent(JSONObject event)
+	public void insertEvent(JsonNode event)
 	{
 		insertEvent(event.toString());
 	}
 
 	public void insertEvent(String event)
 	{
-		DBCollection events = pintDB.getCollection( config.getString( "events") );
+		DBCollection events = pintDB.getCollection( config.get( "events").asText() );
 		events.createIndex(
 			new BasicDBObject("source", 1).append("etime", 2) );
 		DBObject dbObject = (DBObject) JSON.parse(event);
@@ -91,7 +97,7 @@ public class MongoDBManager
 
 	public String getEvent( JSONObject query )
 	{
-		DBCollection events = pintDB.getCollection( config.getString( "events" ) );
+		DBCollection events = pintDB.getCollection( config.get( "events" ).asText() );
 
 		DBObject dbquery = (DBObject)JSON.parse( query.toString() );
 		DBObject result = events.findOne(dbquery);
@@ -119,15 +125,15 @@ public class MongoDBManager
 		System.out.println(event);
 	}
 
-	public static void testInsert() throws UnknownHostException
+	public static void testInsert() throws UnknownHostException, Exception
 	{
 		MongoDBManager mgr = getInstance();
 		String j2 = "{'source':'TOPAZ.PROD','etime':'2014-06-27 06:17:57.878','message':'Apache Camel 2.12.1 starting','id':'org.apache.camel.main.MainSupport','status':'START','etype':'initialization'}";
 		// JSONObject o1 = new JSONObject(j1);
-		JSONObject o2 = new JSONObject(j2);
+		JsonNode o2 = om.readTree( j2 );
 		// mgr.insertEvent(o1);
 		mgr.insertEvent(o2);
-		List<DBObject> list = mgr.pintDB.getCollection( config.getString( "events" )).getIndexInfo();
+		List<DBObject> list = mgr.pintDB.getCollection( config.get( "events" ).asText()).getIndexInfo();
 
 		for (DBObject o : list)
 		{
@@ -138,7 +144,7 @@ public class MongoDBManager
 	public void insertEvent(JSONArray eventList)
 	{
 		int count = eventList.length();
-		DBCollection events = pintDB.getCollection( config.getString( "events" ) );
+		DBCollection events = pintDB.getCollection( config.get( "events" ).asText() );
 		events.createIndex(new BasicDBObject("source", 1).append("etime", 2));
 		List<DBObject> list = new ArrayList<>(count);
 		for (int i = 0; i < count; i++)

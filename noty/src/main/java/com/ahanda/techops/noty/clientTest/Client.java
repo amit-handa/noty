@@ -102,15 +102,15 @@ public final class Client
 				protected void initChannel(SocketChannel ch) throws Exception
 				{
 					ChannelPipeline p = ch.pipeline();
-					p.addLast(new HttpClientCodec());
-					// p.addLast( "decoder", new HttpResponseDecoder());
-					// p.addLast( "encoder", new HttpRequestEncoder());
+					//p.addLast(new HttpClientCodec());
+					 p.addLast( "decoder", new HttpResponseDecoder());
+					 p.addLast( "encoder", new HttpRequestEncoder());
 
 					// Remove the following line if you don't want automatic content decompression.
 					// p.addLast(new HttpContentDecompressor());
 
 					// Uncomment the following line if you don't want to handle HttpContents.
-					p.addLast(new HttpObjectAggregator(1048576));
+					//p.addLast(new HttpObjectAggregator(1048576));
 
 					p.addLast(new ClientHandler());
 				}
