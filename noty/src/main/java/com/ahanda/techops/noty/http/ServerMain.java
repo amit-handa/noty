@@ -14,9 +14,12 @@ import io.netty.handler.codec.http.HttpRequestDecoder;
 import io.netty.handler.codec.http.HttpResponseEncoder;
 import io.netty.util.concurrent.DefaultEventExecutorGroup;
 
+import java.io.IOException;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.ahanda.techops.noty.Config;
 import com.ahanda.techops.noty.db.MongoDBManager;
 import com.ahanda.techops.noty.http.exception.DefaultExceptionHandler;
 
@@ -25,6 +28,10 @@ import com.ahanda.techops.noty.http.exception.DefaultExceptionHandler;
  */
 public class ServerMain
 {
+	private Config config;
+
+	private String host;
+
 	private int port;
 
 	private static final Logger l = LoggerFactory.getLogger(ServerMain.class);
@@ -34,8 +41,29 @@ public class ServerMain
 		this.port = port;
 	}
 
+	public ServerMain()
+	{
+		l.info("Instantiating server");
+	}
+
+	public Config getConfig()
+	{
+		return config;
+	}
+
 	public void run() throws Exception
 	{
+		try
+		{
+			config = Config.getInstance();
+		}
+		catch (IOException e)
+		{
+			l.error("Exception while reading config file, server cannot be started", e);
+			return;
+		}
+		host = config.getHttpHost();
+		port = config.getHttpPort();
 		final DefaultEventExecutorGroup group = new DefaultEventExecutorGroup(100);
 		EventLoopGroup bossGroup = new NioEventLoopGroup();
 		EventLoopGroup workerGroup = new NioEventLoopGroup();
@@ -52,7 +80,7 @@ public class ServerMain
 							ChannelPipeline chp = ch.pipeline();
 							chp.addLast("decoder", new HttpRequestDecoder());
 							chp.addLast("encoder", new HttpResponseEncoder());
-							chp.addLast("aggregator", new HttpObjectAggregator(1048576));
+							chp.addLast("aggregator", new HttpObjectAggregator(config.getHttpObjectAggregatorSize()));
 							chp.addLast("pintRequestDecoder", new RequestDecoder());
 							chp.addLast("httpPayloadEncoder", new ResponseEncoder());
 							chp.addLast("httpPayloadDecoder", new ServerHandler(group));
@@ -63,10 +91,11 @@ public class ServerMain
 			l.info("Created server on port {}", port);
 
 			// Bind and start to accept incoming connections.
-			ChannelFuture f = b.bind(port).sync(); // (7)
+			ChannelFuture f = b.bind(host,port).sync(); // (7)
 
 			// Wait until the server socket is closed.
-			// In this example, this does not happen, but you can do that to gracefully
+			// In this example, this does not happen, but you can do that to
+			// gracefully
 			// shut down your server.
 			f.channel().closeFuture().sync();
 		}
@@ -83,16 +112,6 @@ public class ServerMain
 
 	public static void main(String[] args) throws Exception
 	{
-		int port;
-		if (args.length > 0)
-		{
-			port = Integer.parseInt(args[0]);
-		}
-		else
-		{
-			port = 8080;
-		}
-
-		new ServerMain(port).run();
+		new ServerMain().run();
 	}
 }
