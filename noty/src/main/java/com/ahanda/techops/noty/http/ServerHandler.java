@@ -82,8 +82,7 @@ public class ServerHandler extends SimpleChannelInboundHandler<Request>
 		}
 
 		HttpResponseStatus status = HttpResponseStatus.ACCEPTED;
-		String path = getPath(request);
-		String param = path.split("/")[0];
+		String param = request.getRequestPath().split("/")[0];
 
 		switch (param)
 		{
@@ -105,8 +104,7 @@ public class ServerHandler extends SimpleChannelInboundHandler<Request>
 
 	private void handleReq(final ChannelHandlerContext ctx, final Request request)
 	{
-		String path = getPath(request);
-		List<String> paths = new LinkedList<String>(Arrays.asList(path.split("/")));
+		List<String> paths = new LinkedList<String>(Arrays.asList(request.getRequestPath().split("/")));
 
 		l.debug("paths {}", paths);
 		if (paths.get(0).isEmpty()) // leading '/'
@@ -392,11 +390,5 @@ public class ServerHandler extends SimpleChannelInboundHandler<Request>
 				values.putStringList(key, value);
 		}
 		return values;
-	}
-
-	private String getPath(Request request)
-	{
-		QueryStringDecoder queryStringDecoder = new QueryStringDecoder(request.getHttpRequest().getUri());
-		return queryStringDecoder.path();
 	}
 }
