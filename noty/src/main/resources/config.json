@@ -1,14 +1,10 @@
-
 {
-	"http":
-	{
-		
-		"host" : "localhost"
+	"http":{	
+		"host" : "localhost",
 		"port" : 8080,
 		"objectAggregatorSize" : 1048576		
 	},
-	"mongodb": 
-	{
+	"mongodb": {
 		"host" : "localhost",
 		"port" : 27017
 	}
