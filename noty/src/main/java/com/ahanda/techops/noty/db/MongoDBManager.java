@@ -26,25 +26,24 @@ import com.mongodb.util.JSON;
 
 public class MongoDBManager
 {
-	static final Logger l = LoggerFactory.getLogger( MongoDBManager.class );
+	static final Logger l = LoggerFactory.getLogger(MongoDBManager.class);
 
 	private MongoClient dbconn;
 
 	private static MongoDBManager instance;
+
 	static JSONObject config;
 
-	static {
+	static
+	{
 		config = new JSONObject()
-			.put( "host", "192.168.1.18" ) 
-            .put( "port", 27017 )
-            .put( "dbs", new JSONObject()
-            	.put( "pint", new JSONObject()
-                    .put( "events", new JSONObject()
-                    	.put( "indexes", new JSONArray().put( new JSONArray()
-                    		.put( "esource" )
-                    		.put( "etime" ) ) )
-                    		) ) );
+				.put("host", "192.168.1.18")
+				.put("port", 27017)
+				.put("dbs",
+						new JSONObject().put("pint",
+								new JSONObject().put("events", new JSONObject().put("indexes", new JSONArray().put(new JSONArray().put("esource").put("etime"))))));
 	}
+
 	/*
 	 * This is for unit testing
 	 */
@@ -56,7 +55,7 @@ public class MongoDBManager
 			{
 				if (instance == null)
 				{
-					instance = new MongoDBManager( config );
+					instance = new MongoDBManager(config);
 				}
 			}
 		}
@@ -64,60 +63,67 @@ public class MongoDBManager
 
 	}
 
-	public static void setConfig( JSONObject config ) {
+	public static void setConfig(JSONObject config)
+	{
 		MongoDBManager.config = config;
 	}
 
-	private MongoDBManager( JSONObject config ) throws JSONException, Exception
+	private MongoDBManager(JSONObject config) throws JSONException, Exception
 	{
 		assert config != null;
-		
-		dbconn = new MongoClient( config.getString( "host"), config.getInt( "port") );
-		l.info("Events DB non-null : {}", dbconn );
-		ensureIndex( config.getJSONObject("dbs") );
+
+		dbconn = new MongoClient(config.getString("host"), config.getInt("port"));
+		l.info("Events DB non-null : {}", dbconn);
+		ensureIndex(config.getJSONObject("dbs"));
 	}
 
 	@SuppressWarnings("unchecked")
 	private void ensureIndex(JSONObject dbs) throws Exception
 	{
-		for( String dbname : (Set<String>)dbs.keySet() ) {
+		for (String dbname : (Set<String>) dbs.keySet())
+		{
 			DB db = dbconn.getDB(dbname);
-			JSONObject dbconf = dbs.getJSONObject( dbname );
-			for( String collname : (Set<String>)dbconf.keySet() ) {
-				DBCollection dbcoll = db.getCollection( collname );
-                JSONObject collconf = dbconf.getJSONObject( collname );
-                JSONArray indexes = collconf.getJSONArray("indexes");
-                for( int i = 0; i < indexes.length(); i++ ) {
-                	JSONArray index = indexes.getJSONArray(i);
-                	BasicDBObject dbindex = new BasicDBObject();
-                	for( int j = 0; j < index.length(); j++ ) {
-                		dbindex.append( index.getString(j), j+1);
-                	}
-                    dbcoll.createIndex( dbindex );
-                }
+			JSONObject dbconf = dbs.getJSONObject(dbname);
+			for (String collname : (Set<String>) dbconf.keySet())
+			{
+				DBCollection dbcoll = db.getCollection(collname);
+				JSONObject collconf = dbconf.getJSONObject(collname);
+				JSONArray indexes = collconf.getJSONArray("indexes");
+				for (int i = 0; i < indexes.length(); i++)
+				{
+					JSONArray index = indexes.getJSONArray(i);
+					BasicDBObject dbindex = new BasicDBObject();
+					for (int j = 0; j < index.length(); j++)
+					{
+						dbindex.append(index.getString(j), j + 1);
+					}
+					dbcoll.createIndex(dbindex);
+				}
 			}
 		}
 	}
 
-	public void execOp( JSONObject op )
+	public void execOp(JSONObject op)
 	{
-		DB pintDB = dbconn.getDB( op.getString( "db" ) );
-		DBCollection dbcoll = pintDB.getCollection( op.getString( "collection") );
-		switch( op.getString("action" ) ) {
+		DB pintDB = dbconn.getDB(op.getString("db"));
+		DBCollection dbcoll = pintDB.getCollection(op.getString("collection"));
+		switch (op.getString("action"))
+		{
 		case "save":
-			doSave( dbcoll, op );
+			doSave(dbcoll, op);
 			break;
 		case "find":
-			doFind( dbcoll, op );
+			doFind(dbcoll, op);
 			break;
 		case "update":
-			doUpdate( dbcoll, op );
+			doUpdate(dbcoll, op);
 			break;
-        default:
-        	l.error( "Unsupport DB operation {}", op.getString("action"));
-            break;
+		default:
+			l.error("Unsupport DB operation {}", op.getString("action"));
+			break;
 		}
 	}
+
 	private void doUpdate(DBCollection dbcoll, JSONObject op)
 	{
 	}
@@ -134,13 +140,12 @@ public class MongoDBManager
 		l.info("row : {} inserted. Rows affected : {}", dbcoll, n);
 	}
 
-
-	public String getEvent( JSONObject query )
+	public String getEvent(JSONObject query)
 	{
-		DB pintDB = dbconn.getDB( "pint" );
-		DBCollection events = pintDB.getCollection( config.getString( "events" ) );
+		DB pintDB = dbconn.getDB("pint");
+		DBCollection events = pintDB.getCollection(config.getString("events"));
 
-		DBObject dbquery = (DBObject)JSON.parse( query.toString() );
+		DBObject dbquery = (DBObject) JSON.parse(query.toString());
 		DBObject result = events.findOne(dbquery);
 		if (result == null)
 		{
@@ -162,7 +167,7 @@ public class MongoDBManager
 	private static void testGet() throws JSONException, Exception
 	{
 		MongoDBManager mgr = getInstance();
-		String event = mgr.getEvent( new JSONObject().put( "source", "TOPAZ.PROD" ) );
+		String event = mgr.getEvent(new JSONObject().put("source", "TOPAZ.PROD"));
 		System.out.println(event);
 	}
 
@@ -172,12 +177,12 @@ public class MongoDBManager
 		String j2 = "{'source':'TOPAZ.PROD','etime':'2014-06-27 06:17:57.878','message':'Apache Camel 2.12.1 starting','id':'org.apache.camel.main.MainSupport','status':'START','etype':'initialization'}";
 		// JSONObject o1 = new JSONObject(j1);
 		JSONObject o2 = new JSONObject(j2);
-		o2.put( "action", "save" );
-		o2.put( "db", "pint" );
-		o2.put( "collection", "events" );
+		o2.put("action", "save");
+		o2.put("db", "pint");
+		o2.put("collection", "events");
 		// mgr.insertEvent(o1);
 		mgr.execOp(o2);
-		List<DBObject> list = mgr.dbconn.getDB( "pint" ).getCollection( config.getString( "events" )).getIndexInfo();
+		List<DBObject> list = mgr.dbconn.getDB("pint").getCollection(config.getString("events")).getIndexInfo();
 
 		for (DBObject o : list)
 		{
@@ -188,8 +193,8 @@ public class MongoDBManager
 	public void save(JSONArray eventList)
 	{
 		int count = eventList.length();
-		DB pintDB = dbconn.getDB( "pint" );
-		DBCollection events = pintDB.getCollection( config.getString( "events" ) );
+		DB pintDB = dbconn.getDB("pint");
+		DBCollection events = pintDB.getCollection(config.getString("events"));
 		events.createIndex(new BasicDBObject("source", 1).append("etime", 2));
 		List<DBObject> list = new ArrayList<>(count);
 		for (int i = 0; i < count; i++)
