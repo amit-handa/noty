@@ -7,6 +7,7 @@ import java.net.URL;
 import java.nio.charset.Charset;
 import java.nio.file.Files;
 import java.nio.file.Paths;
+import java.util.Set;
 
 import org.json.JSONObject;
 
@@ -45,7 +46,7 @@ public class Config
 
 	public int getHttpPort()
 	{
-		JSONObject obj = config.getJSONObject("http");
+		JSONObject obj = config.optJSONObject("http");
 		if (obj != null)
 		{
 			return obj.optInt("port", 8080);
@@ -55,7 +56,7 @@ public class Config
 	
 	public String getHttpHost()
 	{
-		JSONObject obj = config.getJSONObject("http");
+		JSONObject obj = config.optJSONObject("http");
 		if (obj != null)
 		{
 			return obj.optString("host", "127.0.0.1");
@@ -65,7 +66,7 @@ public class Config
 	
 	public int getHttpObjectAggregatorSize()
 	{
-		JSONObject obj = config.getJSONObject("http");
+		JSONObject obj = config.optJSONObject("http");
 		if (obj != null)
 		{
 			return obj.optInt("objectAggregatorSize", 1048576);
@@ -75,7 +76,7 @@ public class Config
 	
 	public String getMongoDbHost()
 	{
-		JSONObject obj = config.getJSONObject("mongodb");
+		JSONObject obj = config.optJSONObject("mongodb");
 		if (obj != null)
 		{
 			return obj.optString("host", "127.0.0.1");
@@ -85,11 +86,33 @@ public class Config
 	
 	public int getMongoDbPort()
 	{
-			JSONObject obj = config.getJSONObject("mongodb");
+			JSONObject obj = config.optJSONObject("mongodb");
 			if (obj != null)
 			{
 				return obj.optInt("port", 27017);
 			}
 			return 27017;
 	}
+	
+	public Set getMongoDbs()
+	{
+		JSONObject dbs = config.optJSONObject("dbs");
+		if(dbs != null)
+			return dbs.keySet();
+		return null; 
+	}
+	
+	public JSONObject getCollectionsForDb(String dbName)
+	{
+		JSONObject dbs = config.optJSONObject("dbs");
+		if(dbs != null)
+		{
+			JSONObject colls = dbs.optJSONObject(dbName);
+			if(colls == null)
+				return null;
+			return colls;
+		}
+		return null; 
+	}
+	
 }
