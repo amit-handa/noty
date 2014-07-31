@@ -153,7 +153,7 @@ public class MongoDBManager
 	private static void testGet() throws JSONException, Exception
 	{
 		MongoDBManager mgr = getInstance();
-		String event = mgr.getEvent(new JSONObject().put("source", "TOPAZ.PROD"));
+		String event = mgr.getEvent(new JSONObject().put("esource", "TOPAZ.PROD"));
 		System.out.println(event);
 	}
 
