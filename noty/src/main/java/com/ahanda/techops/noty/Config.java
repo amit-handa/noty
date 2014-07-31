@@ -96,7 +96,10 @@ public class Config
 	
 	public Set getMongoDbs()
 	{
-		JSONObject dbs = config.optJSONObject("dbs");
+		JSONObject mObj = config.optJSONObject("mongodb");
+		if(mObj == null)
+			return null;
+		JSONObject dbs = mObj.optJSONObject("dbs");
 		if(dbs != null)
 			return dbs.keySet();
 		return null; 
@@ -104,7 +107,10 @@ public class Config
 	
 	public JSONObject getCollectionsForDb(String dbName)
 	{
-		JSONObject dbs = config.optJSONObject("dbs");
+		JSONObject mObj = config.optJSONObject("mongodb");
+		if(mObj == null)
+			return null;
+		JSONObject dbs = mObj.optJSONObject("dbs");
 		if(dbs != null)
 		{
 			JSONObject colls = dbs.optJSONObject(dbName);
