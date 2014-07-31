@@ -73,33 +73,19 @@ public class ServerHandler extends SimpleChannelInboundHandler<Request>
 		handleReq(ctx, request);
 	}
 
+	/*
+	 * This functions checks if proper cookie or auth key is available in the headers or not. If not present request will not be granted. This will also check for the method too
+	 */
 	private HttpResponseStatus validateReq(final ChannelHandlerContext ctx, final Request request)
 	{
 		FullHttpRequest httpRequest = request.getHttpRequest();
-		if (httpRequest.getMethod() != POST || !httpRequest.headers().contains("Content-type", "application/json", true))
-		{
-			return HttpResponseStatus.BAD_REQUEST;
-		}
+		if (httpRequest.getMethod() != POST)
+			return HttpResponseStatus.METHOD_NOT_ALLOWED;
 
-		HttpResponseStatus status = HttpResponseStatus.ACCEPTED;
-		String param = request.getRequestPath().split("/")[0];
-
-		switch (param)
-		{
-		case "login":
-			if (username != null)
-				status = HttpResponseStatus.BAD_REQUEST;
-			break;
-		case "events":
-		case "users":
-			if (username == null)
-				status = HttpResponseStatus.BAD_REQUEST;
-			break;
-		default:
-			break;
-		}
-
-		return status;
+		/**
+		 * TODO : Check for headers here to finalize the request
+		 */
+		return HttpResponseStatus.ACCEPTED;
 	}
 
 	private void handleReq(final ChannelHandlerContext ctx, final Request request)
@@ -107,11 +93,15 @@ public class ServerHandler extends SimpleChannelInboundHandler<Request>
 		List<String> paths = new LinkedList<String>(Arrays.asList(request.getRequestPath().split("/")));
 
 		l.debug("paths {}", paths);
-		if (paths.get(0).isEmpty()) // leading '/'
+		if (paths.size() > 0 && paths.get(0).isEmpty()) // leading '/'
 			paths.remove(0);
 
-		String cpath = paths.get(0);
-		paths.remove(0);
+		String cpath = "";
+		if(paths.size() > 0)
+		{
+			cpath = paths.get(0);
+			paths.remove(0);
+		}
 		switch (cpath)
 		{
 		case "login":
@@ -142,7 +132,6 @@ public class ServerHandler extends SimpleChannelInboundHandler<Request>
 		}
 
 		String cpath = paths.get(0);
-
 		switch (cpath)
 		{
 		case "get":
