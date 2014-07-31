@@ -71,7 +71,7 @@ public class MongoDBManager
 				DBCollection dbcoll = db.getCollection(collname);
 				JSONObject collconf = collections.getJSONObject(collname);
 				JSONArray indexes = collconf.getJSONArray("indexes");
-				
+
 				// index for that collection could be null
 				if (indexes != null)
 				{
@@ -106,7 +106,7 @@ public class MongoDBManager
 			doUpdate(dbcoll, op);
 			break;
 		default:
-			l.error("Unsupport DB operation {}", op.getString("action"));
+			l.error("Unsupported DB operation {}", op.getString("action"));
 			break;
 		}
 	}
@@ -166,13 +166,14 @@ public class MongoDBManager
 		o2.put("action", "save");
 		o2.put("db", NotyConstants.Db.PINT_DB);
 		o2.put("collection", NotyConstants.Db.EVENTS_COLLECTION);
-		// mgr.insertEvent(o1);
 		mgr.execOp(o2);
 		List<DBObject> list = mgr.dbconn.getDB(NotyConstants.Db.PINT_DB).getCollection(NotyConstants.Db.EVENTS_COLLECTION).getIndexInfo();
 
 		for (DBObject o : list)
 		{
-			System.out.println(o.get("key"));
+			Object obj = o.get("key");
+			String s = obj != null ? obj.toString() : null;
+			l.info(s);
 		}
 	}
 
@@ -189,6 +190,6 @@ public class MongoDBManager
 			list.add(dbObject);
 		}
 		WriteResult wr = events.insert(list);
-		System.out.println("Bulk insert rows affected : " + wr.getN());
+		l.info("Bulk insert rows affected : " + wr.getN());
 	}
 }
