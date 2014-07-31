@@ -69,19 +69,18 @@ public class MongoDBManager
 			for (String collname : (Set<String>) collections.keySet())
 			{
 				DBCollection dbcoll = db.getCollection(collname);
-				JSONObject collconf = collections.getJSONObject(collname);
-				JSONArray indexes = collconf.getJSONArray("indexes");
-
-				// index for that collection could be null
-				if (indexes != null)
+				JSONObject collconf = collections.optJSONObject(collname);
+				if (collconf != null)
 				{
-					for (int i = 0; i < indexes.length(); i++)
+					JSONArray indexes = collconf.optJSONArray("indexes");
+					// index for that collection could be null
+					if (indexes != null)
 					{
-						JSONArray index = indexes.optJSONArray(i);
 						BasicDBObject dbindex = new BasicDBObject();
-						for (int j = 0; j < index.length(); j++)
+						for (int i = 0; i < indexes.length(); i++)
 						{
-							dbindex.append(index.getString(j), j + 1);
+							String idx = indexes.optString(i);
+							dbindex.append(idx, i + 1);
 						}
 						dbcoll.createIndex(dbindex);
 					}
