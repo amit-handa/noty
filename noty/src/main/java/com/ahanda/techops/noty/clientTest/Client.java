@@ -23,28 +23,19 @@ import io.netty.channel.EventLoopGroup;
 import io.netty.channel.nio.NioEventLoopGroup;
 import io.netty.channel.socket.SocketChannel;
 import io.netty.channel.socket.nio.NioSocketChannel;
-import io.netty.handler.codec.http.ClientCookieEncoder;
-import io.netty.handler.codec.http.DefaultCookie;
-import io.netty.handler.codec.http.DefaultFullHttpRequest;
-import io.netty.handler.codec.http.FullHttpRequest;
 import io.netty.handler.codec.http.HttpClientCodec;
-import io.netty.handler.codec.http.HttpHeaders;
-import io.netty.handler.codec.http.HttpMethod;
 import io.netty.handler.codec.http.HttpObjectAggregator;
-import io.netty.handler.codec.http.HttpRequest;
-import io.netty.handler.codec.http.HttpRequestDecoder;
-import io.netty.handler.codec.http.HttpRequestEncoder;
-import io.netty.handler.codec.http.HttpResponseDecoder;
-import io.netty.handler.codec.http.HttpVersion;
 import io.netty.handler.ssl.SslContext;
 import io.netty.handler.ssl.util.InsecureTrustManagerFactory;
 
-import java.io.StringWriter;
+import java.io.IOException;
 import java.net.URI;
 
 import org.json.JSONObject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import com.ahanda.techops.noty.Config;
 
 /**
  * A simple HTTP client that prints out the content of the HTTP response to {@link System#out} to test {@link HttpSnoopServer}.
@@ -57,25 +48,28 @@ public final class Client
 
 	public static void main(String[] args) throws Exception
 	{
-		URI uri = new URI(URL);
-		String scheme = uri.getScheme() == null ? "http" : uri.getScheme();
-		String host = uri.getHost() == null ? "127.0.0.1" : uri.getHost();
-		int port = uri.getPort();
+		JSONObject config = null; 
+		try
+		{
+			config = Config.getInstance().get();
+		}
+		catch (IOException e)
+		{
+			l.error("Exception while reading config file, server cannot be started", e);
+			return;
+		}
+		String scheme = "http";
+		String host = config.getString("host");
+		int port = config.getInt("port");
+
 		if (port == -1)
 		{
-			if ("http".equalsIgnoreCase(scheme))
-			{
-				port = 80;
-			}
-			else if ("https".equalsIgnoreCase(scheme))
-			{
-				port = 443;
-			}
+            port = 8080;
 		}
 
-		if (!"http".equalsIgnoreCase(scheme) && !"https".equalsIgnoreCase(scheme))
+		if (!"http".equalsIgnoreCase(scheme) )
 		{
-			l.warn("Only HTTP(S) is supported.");
+			l.warn("Only HTTP is supported.");
 			return;
 		}
 

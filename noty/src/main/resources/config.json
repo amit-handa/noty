@@ -2,7 +2,7 @@
 	"http":{	
 		"host" : "localhost",
 		"port" : 8080,
-		"objectAggregatorSize" : 1048576		
+		"maxRequestSize" : 1048576		
 	},
 	"mongodb": {
 		"host" : "localhost",

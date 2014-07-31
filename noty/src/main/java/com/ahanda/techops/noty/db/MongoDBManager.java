@@ -28,7 +28,8 @@ public class MongoDBManager
 
 	private static MongoDBManager instance;
 
-	Config config = Config.getInstance();
+	JSONObject config = Config.getInstance().get();
+	JSONObject defconfig = Config.getInstance().getDefault();
 
 	/*
 	 * This is for unit testing
@@ -51,7 +52,11 @@ public class MongoDBManager
 
 	private MongoDBManager() throws JSONException, Exception
 	{
-		dbconn = new MongoClient(config.getMongoDbHost(), config.getMongoDbPort());
+		String host = config.optString("host", defconfig.getString("host"));
+
+		int port = config.optInt("port", defconfig.getInt("port"));
+
+		dbconn = new MongoClient( host, port );
 		l.info("Events DB non-null : {}", dbconn);
 		ensureIndex();
 	}
@@ -59,17 +64,17 @@ public class MongoDBManager
 	@SuppressWarnings("unchecked")
 	private void ensureIndex() throws Exception
 	{
-		Set<String> dbs = config.getMongoDbs();
+		JSONObject dbs = config.getJSONObject("db").getJSONObject("dbs");
 		if (dbs == null)
 			return;
-		for (String dbname : dbs)
+		for (String dbname : (Set<String>)dbs.keySet() )
 		{
 			DB db = dbconn.getDB(dbname);
-			JSONObject collections = config.getCollectionsForDb(dbname);
-			for (String collname : (Set<String>) collections.keySet())
+			JSONObject dbconf = dbs.getJSONObject(dbname);
+			for (String collname : (Set<String>)dbconf.keySet() )
 			{
 				DBCollection dbcoll = db.getCollection(collname);
-				JSONObject collconf = collections.optJSONObject(collname);
+				JSONObject collconf = dbconf.getJSONObject(collname);
 				if (collconf != null)
 				{
 					JSONArray indexes = collconf.optJSONArray("indexes");
@@ -79,7 +84,7 @@ public class MongoDBManager
 						BasicDBObject dbindex = new BasicDBObject();
 						for (int i = 0; i < indexes.length(); i++)
 						{
-							String idx = indexes.optString(i);
+							String idx = indexes.getString(i);
 							dbindex.append(idx, i + 1);
 						}
 						dbcoll.createIndex(dbindex);
