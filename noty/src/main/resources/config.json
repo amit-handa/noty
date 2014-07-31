@@ -6,6 +6,13 @@
 	},
 	"mongodb": {
 		"host" : "localhost",
-		"port" : 27017
+		"port" : 27017,
+		"dbs" : {
+			"pint" : {	
+					"events" : {
+						"indexes" : ["esource","etime"]
+					}
+			}
+		}
 	}
 }
