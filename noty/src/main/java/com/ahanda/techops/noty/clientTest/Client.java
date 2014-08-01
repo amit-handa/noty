@@ -51,7 +51,7 @@ public final class Client
 		JSONObject config = null; 
 		try
 		{
-			config = Config.getInstance().get();
+			config = Config.getInstance().get().getJSONObject("http");
 		}
 		catch (IOException e)
 		{

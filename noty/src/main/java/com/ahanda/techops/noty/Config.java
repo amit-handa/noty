@@ -22,7 +22,7 @@ public class Config
                 .put("host", "localhost")
                 .put("port", 8080 )
                 .put("maxRequestSize", 1048576 ) )
-             .put( "db", new JSONObject()
+             .put( "mongodb", new JSONObject()
              	.put( "host", "localhost" )
              	.put( "port", 27017 ) );
 	}

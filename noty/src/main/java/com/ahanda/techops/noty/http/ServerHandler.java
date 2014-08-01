@@ -272,33 +272,51 @@ public class ServerHandler extends SimpleChannelInboundHandler<Request>
 	{
 		FullHttpRequest httpRequest = request.getHttpRequest();
 
-		final JSONObject query = new JSONObject(httpRequest.content().toString(CharsetUtil.UTF_8));
-		Future<String> future = executor.submit(new Callable<String>()
+		final JSONObject matcher = new JSONObject(httpRequest.content().toString(CharsetUtil.UTF_8));
+		Future<JSONObject> future = executor.submit(new Callable<JSONObject>()
 		{
 			@Override
-			public String call() throws Exception
+			public JSONObject call() throws Exception
 			{
-				return MongoDBManager.getInstance().getEvent(query);
+				JSONObject op = new JSONObject();
+                op.put("action", "find");
+                op.put("db", "pint");
+                op.put("collection", "events");
+                op.put("matcher", matcher);
+				return MongoDBManager.getInstance().execOp(op);
 			}
 		});
-		future.addListener(new GenericFutureListener<Future<String>>()
+		future.addListener(new GenericFutureListener<Future<JSONObject>>()
 		{
 			@Override
-			public void operationComplete(Future<String> future) throws Exception
+			public void operationComplete(Future<JSONObject> future) throws Exception
 			{
-				String event = future.get();
-				if (future.isSuccess() && event != null)
-				{
-					// Build the response object
-					FullHttpResponse httpResponse = new DefaultFullHttpResponse(HTTP_1_1, OK, Unpooled.copiedBuffer(event, CharsetUtil.UTF_8));
-					httpResponse.headers().set(CONTENT_TYPE, "application/json");
-					FullEncodedResponse encodedResponse = new FullEncodedResponse(request, httpResponse);
-					ctx.writeAndFlush(encodedResponse);
-				}
-				else
+				if (!future.isSuccess() )
 				{
 					ctx.fireExceptionCaught(future.cause());
 				}
+
+				JSONObject event = future.get();
+
+				HttpResponseStatus resp = HttpResponseStatus.OK;
+				String msg;
+				if( event == null ) {
+					resp = HttpResponseStatus.INTERNAL_SERVER_ERROR;
+					msg = "Internal Server Error";
+				} else if( !event.getString("status").equals( "ok") ) {
+					resp = HttpResponseStatus.INTERNAL_SERVER_ERROR;
+					msg = event.getString("message");
+				} else {
+					resp = HttpResponseStatus.OK;
+					msg = event.getJSONArray("results").toString();
+				}
+				
+
+                // Build the response object
+                FullHttpResponse httpResponse = new DefaultFullHttpResponse(HTTP_1_1, resp, Unpooled.copiedBuffer(msg, CharsetUtil.UTF_8));
+                httpResponse.headers().set(CONTENT_TYPE, "application/json");
+                FullEncodedResponse encodedResponse = new FullEncodedResponse(request, httpResponse);
+                ctx.writeAndFlush(encodedResponse);
 			}
 		});
 	}
@@ -328,6 +346,9 @@ public class ServerHandler extends SimpleChannelInboundHandler<Request>
 				try
 				{
 					JSONObject op = new JSONObject();
+					op.put("action", "save");
+					op.put("db", "pint");
+					op.put("collection", "events");
 					op.put("document", eventList);
 					MongoDBManager.getInstance().execOp(op);
 					return true;
