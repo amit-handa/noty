@@ -14,6 +14,22 @@ import org.json.JSONObject;
 public class Config
 {
 	private JSONObject config;
+	private static JSONObject defconfig;
+	
+	static {
+		defconfig = new JSONObject()
+			.put("http", new JSONObject()
+                .put("host", "localhost")
+                .put("port", 8080 )
+                .put("maxRequestSize", 1048576 ) )
+             .put( "db", new JSONObject()
+             	.put( "host", "localhost" )
+             	.put( "port", 27017 ) );
+	}
+
+	public static JSONObject getDefault() {
+		return defconfig;
+	}
 
 	private static Config _instance;
 
@@ -44,81 +60,8 @@ public class Config
 		config = new JSONObject(jsonStr);
 	}
 
-	public int getHttpPort()
-	{
-		JSONObject obj = config.optJSONObject("http");
-		if (obj != null)
-		{
-			return obj.optInt("port", 8080);
-		}
-		return 8080;
+	public JSONObject get() {
+		return config;
 	}
-	
-	public String getHttpHost()
-	{
-		JSONObject obj = config.optJSONObject("http");
-		if (obj != null)
-		{
-			return obj.optString("host", "127.0.0.1");
-		}
-		return "127.0.0.1";
-	}
-	
-	public int getHttpObjectAggregatorSize()
-	{
-		JSONObject obj = config.optJSONObject("http");
-		if (obj != null)
-		{
-			return obj.optInt("objectAggregatorSize", 1048576);
-		}
-		return 1048576;
-	}
-	
-	public String getMongoDbHost()
-	{
-		JSONObject obj = config.optJSONObject("mongodb");
-		if (obj != null)
-		{
-			return obj.optString("host", "127.0.0.1");
-		}
-		return "127.0.0.1";
-	}
-	
-	public int getMongoDbPort()
-	{
-			JSONObject obj = config.optJSONObject("mongodb");
-			if (obj != null)
-			{
-				return obj.optInt("port", 27017);
-			}
-			return 27017;
-	}
-	
-	public Set getMongoDbs()
-	{
-		JSONObject mObj = config.optJSONObject("mongodb");
-		if(mObj == null)
-			return null;
-		JSONObject dbs = mObj.optJSONObject("dbs");
-		if(dbs != null)
-			return dbs.keySet();
-		return null; 
-	}
-	
-	public JSONObject getCollectionsForDb(String dbName)
-	{
-		JSONObject mObj = config.optJSONObject("mongodb");
-		if(mObj == null)
-			return null;
-		JSONObject dbs = mObj.optJSONObject("dbs");
-		if(dbs != null)
-		{
-			JSONObject colls = dbs.optJSONObject(dbName);
-			if(colls == null)
-				return null;
-			return colls;
-		}
-		return null; 
-	}
-	
+
 }

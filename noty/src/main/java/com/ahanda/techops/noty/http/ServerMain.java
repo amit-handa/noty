@@ -16,6 +16,7 @@ import io.netty.util.concurrent.DefaultEventExecutorGroup;
 
 import java.io.IOException;
 
+import org.json.JSONObject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -28,10 +29,10 @@ import com.ahanda.techops.noty.http.exception.DefaultExceptionHandler;
  */
 public class ServerMain
 {
-	private Config config;
+	private JSONObject config;
+	private JSONObject defconfig = Config.getDefault();
 
 	private String host;
-
 	private int port;
 
 	private static final Logger l = LoggerFactory.getLogger(ServerMain.class);
@@ -46,24 +47,29 @@ public class ServerMain
 		l.info("Instantiating server");
 	}
 
-	public Config getConfig()
-	{
-		return config;
-	}
-
 	public void run() throws Exception
 	{
 		try
 		{
-			config = Config.getInstance();
+			config = Config.getInstance().get();
 		}
 		catch (IOException e)
 		{
 			l.error("Exception while reading config file, server cannot be started", e);
 			return;
 		}
-		host = config.getHttpHost();
-		port = config.getHttpPort();
+
+		final JSONObject httpconfig = config.getJSONObject( "http" );
+		JSONObject defhttpconfig = config.getJSONObject( "http" );
+
+        host = defhttpconfig.getString("host" );
+        port = defhttpconfig.getInt("port" );
+        final int maxRequestSize = defhttpconfig.getInt("maxRequestSize" );
+		if( httpconfig != null ) {
+			host = httpconfig.optString("host", host );
+			port = httpconfig.optInt("port", port );
+		}
+
 		final DefaultEventExecutorGroup group = new DefaultEventExecutorGroup(100);
 		EventLoopGroup bossGroup = new NioEventLoopGroup();
 		EventLoopGroup workerGroup = new NioEventLoopGroup();
@@ -80,7 +86,7 @@ public class ServerMain
 							ChannelPipeline chp = ch.pipeline();
 							chp.addLast("decoder", new HttpRequestDecoder());
 							chp.addLast("encoder", new HttpResponseEncoder());
-							chp.addLast("aggregator", new HttpObjectAggregator(config.getHttpObjectAggregatorSize()));
+							chp.addLast("aggregator", new HttpObjectAggregator( httpconfig.optInt("maxRequestSize", maxRequestSize ) ) );
 							chp.addLast("pintRequestDecoder", new RequestDecoder());
 							chp.addLast("httpPayloadEncoder", new ResponseEncoder());
 							chp.addLast("httpPayloadDecoder", new ServerHandler(group));
