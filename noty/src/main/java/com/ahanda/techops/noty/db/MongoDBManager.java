@@ -79,7 +79,7 @@ public class MongoDBManager
 						BasicDBObject dbindex = new BasicDBObject();
 						for (int i = 0; i < indexes.length(); i++)
 						{
-							String idx = indexes.optString(i);
+							String idx = indexes.getString(i);
 							dbindex.append(idx, i + 1);
 						}
 						dbcoll.createIndex(dbindex);
