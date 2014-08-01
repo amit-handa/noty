@@ -70,6 +70,7 @@ public class ServerMain
 			port = httpconfig.optInt("port", port );
 		}
 
+		l.info("creating server on {} {}", host, port );
 		final DefaultEventExecutorGroup group = new DefaultEventExecutorGroup(100);
 		EventLoopGroup bossGroup = new NioEventLoopGroup();
 		EventLoopGroup workerGroup = new NioEventLoopGroup();
