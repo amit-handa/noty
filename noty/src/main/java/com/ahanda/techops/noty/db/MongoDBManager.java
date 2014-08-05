@@ -1,20 +1,27 @@
 package com.ahanda.techops.noty.db;
 
 import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.Iterator;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
-import org.json.JSONArray;
 import org.json.JSONException;
-import org.json.JSONObject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.ahanda.techops.noty.Config;
-import com.ahanda.techops.noty.NotyConstants;
+import com.ahanda.techops.noty.Utils;
+import com.fasterxml.jackson.databind.JsonNode;
+
+import static com.ahanda.techops.noty.NotyConstants.*;
+
 import com.mongodb.BasicDBObject;
 import com.mongodb.DB;
 import com.mongodb.DBCollection;
+import com.mongodb.DBCursor;
 import com.mongodb.DBObject;
 import com.mongodb.MongoClient;
 import com.mongodb.WriteResult;
@@ -28,8 +35,8 @@ public class MongoDBManager
 
 	private static MongoDBManager instance;
 
-	JSONObject config = Config.getInstance().get();
-	JSONObject defconfig = Config.getInstance().getDefault();
+	JsonNode config = Config.getInstance().get().get("mongodb");
+	JsonNode defconfig = Config.getDefault().get("mongodb");
 
 	/*
 	 * This is for unit testing
@@ -52,9 +59,13 @@ public class MongoDBManager
 
 	private MongoDBManager() throws JSONException, Exception
 	{
-		String host = config.optString("host", defconfig.getString("host"));
+		String host = defconfig.get(HOST).asText();
+		JsonNode tmp = config.get(HOST);
+		host = tmp != null ? tmp.asText() : host;
 
-		int port = config.optInt("port", defconfig.getInt("port"));
+        int port = defconfig.get(PORT).asInt();
+		tmp = config.get(PORT );
+		port = tmp != null ? tmp.asInt() : port;
 
 		dbconn = new MongoClient( host, port );
 		l.info("Events DB non-null : {}", dbconn);
@@ -64,79 +75,103 @@ public class MongoDBManager
 	@SuppressWarnings("unchecked")
 	private void ensureIndex() throws Exception
 	{
-		JSONObject dbs = config.getJSONObject("db").getJSONObject("dbs");
-		if (dbs == null)
-			return;
-		for (String dbname : (Set<String>)dbs.keySet() )
-		{
-			DB db = dbconn.getDB(dbname);
-			JSONObject dbconf = dbs.getJSONObject(dbname);
-			for (String collname : (Set<String>)dbconf.keySet() )
-			{
-				DBCollection dbcoll = db.getCollection(collname);
-				JSONObject collconf = dbconf.getJSONObject(collname);
-				if (collconf != null)
-				{
-					JSONArray indexes = collconf.optJSONArray("indexes");
-					// index for that collection could be null
-					if (indexes != null)
-					{
-						BasicDBObject dbindex = new BasicDBObject();
-						for (int i = 0; i < indexes.length(); i++)
-						{
-							String idx = indexes.getString(i);
-							dbindex.append(idx, i + 1);
-						}
-						dbcoll.createIndex(dbindex);
-					}
-				}
-			}
-		}
+		JsonNode dbconf = config.get(MONGODB.PINT_DB);
+        DB db = dbconn.getDB(MONGODB.PINT_DB);
+        Iterator< Map.Entry< String, JsonNode > > collI = dbconf.fields();
+        while( collI.hasNext() )
+        {
+        	Map.Entry< String, JsonNode > coll = collI.next();
+            DBCollection dbcoll = db.getCollection(coll.getKey());
+            JsonNode collconf = coll.getValue();
+            JsonNode indexes = collconf.get("indexes");
+
+            // index for that collection could be null
+            if (indexes != null)
+            {
+                BasicDBObject dbindex = new BasicDBObject();
+                for (int i = 0; i < indexes.size(); i++)
+                {
+                    String idx = indexes.get(i).asText();
+                    dbindex.append(idx, i + 1);
+                }
+                dbcoll.createIndex(dbindex);
+            }
+        }
 	}
 
-	public void execOp(JSONObject op)
+	public Map< String, Object > execOp(Map< String, Object > op)
 	{
-		DB pintDB = dbconn.getDB(op.getString("db"));
-		DBCollection dbcoll = pintDB.getCollection(op.getString("collection"));
-		switch (op.getString("action"))
+		DB pintDB = dbconn.getDB((String)op.get("db"));
+		DBCollection dbcoll = pintDB.getCollection( (String)op.get("collection"));
+		String action = (String)op.get("action");
+		
+		switch ( action )
 		{
 		case "save":
-			doSave(dbcoll, op);
-			break;
+			List< Object > events = Utils.doCast( op.get("document") );
+			return doSave(dbcoll, events );
 		case "find":
-			doFind(dbcoll, op);
-			break;
+			return doFind(dbcoll, op);
 		case "update":
-			doUpdate(dbcoll, op);
-			break;
+			return doUpdate(dbcoll, op);
 		default:
-			l.error("Unsupported DB operation {}", op.getString("action"));
+			l.error("Unsupported DB operation {}", action );
 			break;
 		}
+		
+		return null;
 	}
 
-	private void doUpdate(DBCollection dbcoll, JSONObject op)
+	private Map< String, Object > doUpdate(DBCollection dbcoll, Map< String, Object > op)
 	{
+		return new LinkedHashMap< String, Object >();
 	}
 
-	private void doFind(DBCollection dbcoll, JSONObject op)
+	private Map< String, Object > doFind(DBCollection dbcoll, Map< String, Object > op)
 	{
+		l.info("reached exec find!");
+		Map< String, Object > retval = new LinkedHashMap< String, Object >();
+        Map< String, Object > matcher = Utils.doCast(op.get( "matcher" ) );
+        DBObject dbquery = new BasicDBObject( matcher );
+
+		DBCursor result = dbcoll.find( dbquery );
+		List< Object > results = new ArrayList< Object >();
+		for( DBObject o : result )
+		{
+			o.removeField("_id");
+			results.add( o.toMap() );
+		}
+
+		retval.put("results", results );
+		retval.put("status", "ok" );
+		return retval;
 	}
 
-	private void doSave(DBCollection dbcoll, JSONObject op)
+	private Map< String, Object > doSave(DBCollection dbcoll, List< Object > op)
 	{
-		DBObject dbObject = (DBObject) JSON.parse(op.toString());
-		WriteResult wr = dbcoll.insert(dbObject);
-		int n = wr.getN();
-		l.info("row : {} inserted. Rows affected : {}", dbcoll, n);
+		Map< String, Object > retval = new HashMap< String, Object >();
+
+		int n = 0;
+		for( int i = 0; i < op.size(); i++ ) {
+			Map<String, Object > m = Utils.doCast( op.get(i) );
+            DBObject dbObject = new BasicDBObject( m );
+            WriteResult wr = dbcoll.insert( dbObject );
+            n += wr.getN();
+		}
+        l.info("row : {} inserted. Rows affected : {}", dbcoll, n);
+
+        retval.put("status", "ok" );
+        retval.put( "results", n );
+		return retval;
 	}
 
-	public String getEvent(JSONObject query)
+	public String getEvent(Map< String, Object > query)
 	{
-		DB pintDB = dbconn.getDB(NotyConstants.Db.PINT_DB);
-		DBCollection events = pintDB.getCollection(NotyConstants.Db.EVENTS_COLLECTION);
-		DBObject dbquery = (DBObject) JSON.parse(query.toString());
-		DBObject result = events.findOne(dbquery);
+		DB db = dbconn.getDB( (String)query.get("db") );
+		DBCollection coll = db.getCollection( (String)query.get("collection") );
+		Map< String, Object > matcher = Utils.doCast(query.get( "matcher" ) );
+		DBObject dbquery = new BasicDBObject( matcher );
+		DBObject result = coll.findOne(dbquery);
 		if (result == null)
 		{
 			return null;
@@ -145,7 +180,7 @@ public class MongoDBManager
 
 		String event = result.toString();
 
-		l.info("Returning : {}", event);
+		l.info("find result : {}", event);
 		return event;
 	}
 
@@ -157,7 +192,9 @@ public class MongoDBManager
 	private static void testGet() throws JSONException, Exception
 	{
 		MongoDBManager mgr = getInstance();
-		String event = mgr.getEvent(new JSONObject().put("esource", "TOPAZ.PROD"));
+        Map< String, Object > matcher = new LinkedHashMap< String, Object >();
+        matcher.put("esource", "TOPAZ.PROD");
+		String event = mgr.getEvent( matcher );
 		System.out.println(event);
 	}
 
@@ -165,13 +202,14 @@ public class MongoDBManager
 	{
 		MongoDBManager mgr = getInstance();
 		String j2 = "{'esource':'TOPAZ.PROD','etime':'2014-06-27 06:17:57.878','message':'Apache Camel 2.12.1 starting','id':'org.apache.camel.main.MainSupport','status':'START','etype':'initialization'}";
-		// JSONObject o1 = new JSONObject(j1);
-		JSONObject o2 = new JSONObject(j2);
+		// JsonNode o1 = new JsonNode(j1);
+		Map< String, Object > o2 = new LinkedHashMap< String, Object >();
 		o2.put("action", "save");
-		o2.put("db", NotyConstants.Db.PINT_DB);
-		o2.put("collection", NotyConstants.Db.EVENTS_COLLECTION);
+		o2.put("db", MONGODB.PINT_DB);
+		o2.put("collection", MONGODB.EVENTS_COLL);
 		mgr.execOp(o2);
-		List<DBObject> list = mgr.dbconn.getDB(NotyConstants.Db.PINT_DB).getCollection(NotyConstants.Db.EVENTS_COLLECTION).getIndexInfo();
+
+		List<DBObject> list = mgr.dbconn.getDB(MONGODB.PINT_DB).getCollection(MONGODB.EVENTS_COLL).getIndexInfo();
 
 		for (DBObject o : list)
 		{
@@ -181,16 +219,17 @@ public class MongoDBManager
 		}
 	}
 
-	public void save(JSONArray eventList)
+	public void save(JsonNode eventList)
 	{
-		int count = eventList.length();
-		DB pintDB = dbconn.getDB(NotyConstants.Db.PINT_DB);
-		DBCollection events = pintDB.getCollection(NotyConstants.Db.EVENTS_COLLECTION);
-		events.createIndex(new BasicDBObject(NotyConstants.Db.ESOURCE, 1).append(NotyConstants.Db.ETIME, 2));
+		int count = eventList.size();
+		DB pintDB = dbconn.getDB(MONGODB.PINT_DB);
+		DBCollection events = pintDB.getCollection(MONGODB.EVENTS_COLL);
+		events.createIndex(new BasicDBObject(MONGODB.ESOURCE_COL, 1).append(MONGODB.ETIME_COL, 2));
+		
 		List<DBObject> list = new ArrayList<>(count);
 		for (int i = 0; i < count; i++)
 		{
-			DBObject dbObject = (DBObject) JSON.parse(eventList.getJSONObject(i).toString());
+			DBObject dbObject = (DBObject) JSON.parse(eventList.get(i).toString());
 			list.add(dbObject);
 		}
 		WriteResult wr = events.insert(list);

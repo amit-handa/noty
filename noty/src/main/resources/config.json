@@ -5,14 +5,12 @@
 		"maxRequestSize" : 1048576		
 	},
 	"mongodb": {
-		"host" : "localhost",
+		"host" : "192.168.1.18",
 		"port" : 27017,
-		"dbs" : {
-			"pint" : {	
-					"events" : {
-						"indexes" : ["esource","etime"]
-					}
-			}
-		}
+        "pint" : {	
+                "events" : {
+                    "indexes" : ["esource","etime"]
+                }
+        }
 	}
 }
