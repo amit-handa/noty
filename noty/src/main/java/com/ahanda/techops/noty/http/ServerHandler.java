@@ -11,13 +11,11 @@ import io.netty.handler.codec.http.DefaultFullHttpResponse;
 import io.netty.handler.codec.http.FullHttpRequest;
 import io.netty.handler.codec.http.FullHttpResponse;
 import io.netty.handler.codec.http.HttpResponseStatus;
-import io.netty.handler.codec.http.QueryStringDecoder;
 import io.netty.util.CharsetUtil;
 import io.netty.util.concurrent.EventExecutorGroup;
 import io.netty.util.concurrent.Future;
 import io.netty.util.concurrent.GenericFutureListener;
 
-import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -25,14 +23,15 @@ import java.util.LinkedHashMap;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
-import java.util.Map.Entry;
 import java.util.concurrent.Callable;
 
+import org.json.JSONException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.ahanda.techops.noty.Utils;
 import com.ahanda.techops.noty.db.MongoDBManager;
+import com.ahanda.techops.noty.http.exception.NotyException;
 import com.ahanda.techops.noty.http.message.FullEncodedResponse;
 import com.ahanda.techops.noty.http.message.Request;
 import com.fasterxml.jackson.core.type.TypeReference;
@@ -59,16 +58,14 @@ public class ServerHandler extends SimpleChannelInboundHandler<Request>
 	}
 
 	@Override
-	protected void channelRead0(final ChannelHandlerContext ctx, final Request request) throws IOException, InstantiationException, IllegalAccessException
+	protected void channelRead0(final ChannelHandlerContext ctx, final Request request) throws Exception
 	{
 		l.debug("Received request for {}", request.getHttpRequest());
 
 		HttpResponseStatus status = validateReq(ctx, request);
 		if (status != HttpResponseStatus.ACCEPTED)
 		{
-			FullHttpResponse httpResponse = new DefaultFullHttpResponse(HTTP_1_1, status);
-			FullEncodedResponse encodedResponse = new FullEncodedResponse(request, httpResponse);
-			ctx.writeAndFlush(encodedResponse);
+			sendResponse(ctx, request, status);
 			return;
 		}
 
@@ -90,7 +87,7 @@ public class ServerHandler extends SimpleChannelInboundHandler<Request>
 		return HttpResponseStatus.ACCEPTED;
 	}
 
-	private void handleReq(final ChannelHandlerContext ctx, final Request request)
+	private void handleReq(final ChannelHandlerContext ctx, final Request request) throws Exception
 	{
 		List<String> paths = new LinkedList<String>(Arrays.asList(request.getRequestPath().split("/")));
 
@@ -99,7 +96,7 @@ public class ServerHandler extends SimpleChannelInboundHandler<Request>
 			paths.remove(0);
 
 		String cpath = "";
-		if(paths.size() > 0)
+		if (paths.size() > 0)
 		{
 			cpath = paths.get(0);
 			paths.remove(0);
@@ -117,15 +114,12 @@ public class ServerHandler extends SimpleChannelInboundHandler<Request>
 			break;
 		default:
 			l.error("Invalid resource requested {}", cpath);
-			FullHttpResponse httpResponse = new DefaultFullHttpResponse(HTTP_1_1, HttpResponseStatus.BAD_REQUEST);
-			FullEncodedResponse encodedResponse = new FullEncodedResponse(request, httpResponse);
-			ctx.writeAndFlush(encodedResponse);
-			break;
+			throw new NotyException(HttpResponseStatus.NOT_FOUND, "Invalid resource requested : " + cpath);
 		}
 
 	}
 
-	private void handleUsers(final List<String> paths, final ChannelHandlerContext ctx, final Request request)
+	private void handleUsers(final List<String> paths, final ChannelHandlerContext ctx, final Request request) throws NotyException
 	{
 		if (paths.isEmpty())
 		{
@@ -141,29 +135,27 @@ public class ServerHandler extends SimpleChannelInboundHandler<Request>
 			break;
 		default:
 			l.error("Invalid user resource requested {}", cpath);
-			FullHttpResponse httpResponse = new DefaultFullHttpResponse(HTTP_1_1, HttpResponseStatus.BAD_REQUEST);
-			FullEncodedResponse encodedResponse = new FullEncodedResponse(request, httpResponse);
-			ctx.writeAndFlush(encodedResponse);
-			break;
+			throw new NotyException(HttpResponseStatus.NOT_FOUND, "Invalid event resource requested : " + cpath);
 		}
 	}
 
-	private void pubUsers(final ChannelHandlerContext ctx, final Request request)
+	private void pubUsers(final ChannelHandlerContext ctx, final Request request) throws NotyException
 	{
 		l.debug("received request for publishing user !!!!");
 		FullHttpRequest httpRequest = request.getHttpRequest();
 
 		String jsonString = httpRequest.content().toString(CharsetUtil.UTF_8);
-		final Map< String, Object > userConf;
+		final Map<String, Object> userConf;
 		try
 		{
-			userConf = Utils.om.readValue( jsonString, new TypeReference<HashMap< String, Object>>() {} );
+			userConf = Utils.om.readValue(jsonString, new TypeReference<HashMap<String, Object>>()
+			{
+			});
 		}
 		catch (Exception e)
 		{
-			l.error("Json conversion error for user conf");
-			ctx.fireExceptionCaught(e);
-			return;
+			l.error("Exception while json handling", e);
+			throw new NotyException(request, HttpResponseStatus.UNPROCESSABLE_ENTITY, e);
 		}
 
 		Future<Boolean> future = executor.submit(new Callable<Boolean>()
@@ -191,30 +183,33 @@ public class ServerHandler extends SimpleChannelInboundHandler<Request>
 				boolean insertSuccess = future.get();
 				if (future.isSuccess() && insertSuccess)
 				{
-					// Build the response object
-					FullHttpResponse httpResponse = new DefaultFullHttpResponse(HTTP_1_1, OK);
-					FullEncodedResponse encodedResponse = new FullEncodedResponse(request, httpResponse);
-					ctx.writeAndFlush(encodedResponse);
+					sendResponse(ctx, request, OK);
 				}
 				else
 				{
-					ctx.fireExceptionCaught(future.cause());
+					ctx.fireExceptionCaught(new NotyException(request, HttpResponseStatus.UNPROCESSABLE_ENTITY, future.cause()));
 				}
 			}
 		});
 	}
 
-	private void getUsers(final ChannelHandlerContext ctx, final Request request)
+	private void getUsers(final ChannelHandlerContext ctx, final Request request) throws NotyException
 	{
 		FullHttpRequest httpRequest = request.getHttpRequest();
 
-		Map< String, Object > tmp = null;
-		try {
-            tmp = Utils.om.readValue(httpRequest.content().toString(CharsetUtil.UTF_8), new TypeReference< Map< String, Object >>() {} );
-		} catch( Exception e ) {
-			ctx.fireExceptionCaught( e );
+		final Map<String, Object> query;
+		try
+		{
+			query = Utils.om.readValue(httpRequest.content().toString(CharsetUtil.UTF_8), new TypeReference<Map<String, Object>>()
+			{
+			});
 		}
-		final Map< String, Object > query = tmp;
+		catch (Exception e)
+		{
+			l.error("Exception while json handling", e);
+			throw new NotyException(request, HttpResponseStatus.UNPROCESSABLE_ENTITY, e);
+		}
+
 		Future<String> future = executor.submit(new Callable<String>()
 		{
 			@Override
@@ -231,15 +226,11 @@ public class ServerHandler extends SimpleChannelInboundHandler<Request>
 				String event = future.get();
 				if (future.isSuccess() && event != null)
 				{
-					// Build the response object
-					FullHttpResponse httpResponse = new DefaultFullHttpResponse(HTTP_1_1, OK, Unpooled.copiedBuffer(event, CharsetUtil.UTF_8));
-					httpResponse.headers().set(CONTENT_TYPE, "application/json");
-					FullEncodedResponse encodedResponse = new FullEncodedResponse(request, httpResponse);
-					ctx.writeAndFlush(encodedResponse);
+					sendJsonResponse(ctx, request, OK, event);
 				}
 				else
 				{
-					ctx.fireExceptionCaught(future.cause());
+					ctx.fireExceptionCaught(new NotyException(request, HttpResponseStatus.UNPROCESSABLE_ENTITY, future.cause()));
 				}
 			}
 		});
@@ -252,7 +243,7 @@ public class ServerHandler extends SimpleChannelInboundHandler<Request>
 		assert paths.isEmpty();
 	}
 
-	private void handleEvents(final List<String> paths, final ChannelHandlerContext ctx, final Request request)
+	private void handleEvents(final List<String> paths, final ChannelHandlerContext ctx, final Request request) throws NotyException
 	{
 		if (paths.isEmpty())
 		{
@@ -269,146 +260,137 @@ public class ServerHandler extends SimpleChannelInboundHandler<Request>
 			break;
 		default:
 			l.error("Invalid event resource requested {}", cpath);
-			FullHttpResponse httpResponse = new DefaultFullHttpResponse(HTTP_1_1, HttpResponseStatus.BAD_REQUEST);
-			FullEncodedResponse encodedResponse = new FullEncodedResponse(request, httpResponse);
-			ctx.writeAndFlush(encodedResponse);
-			break;
+			throw new NotyException(HttpResponseStatus.NOT_FOUND, "Invalid event resource requested : " + cpath);
 		}
 	}
 
-	private void getEvents(final ChannelHandlerContext ctx, final Request request)
+	private void getEvents(final ChannelHandlerContext ctx, final Request request) throws NotyException
 	{
 		FullHttpRequest httpRequest = request.getHttpRequest();
 
-		Map< String, Object > tmp = null;
-		try {
-			tmp = Utils.om.readValue(httpRequest.content().toString(CharsetUtil.UTF_8), new TypeReference< HashMap< String, Object >>() {} );
-		} catch( Exception e ) {
-			ctx.fireExceptionCaught( e );
+		final Map<String, Object> matcher;
+		try
+		{
+			matcher = Utils.om.readValue(httpRequest.content().toString(CharsetUtil.UTF_8), new TypeReference<HashMap<String, Object>>()
+			{
+			});
 		}
-
-		final Map< String, Object > matcher = tmp;
+		catch (Exception e)
+		{
+			l.error("Exception while creating a map from output", e);
+			throw new NotyException(request, HttpResponseStatus.UNPROCESSABLE_ENTITY, e);
+		}
 
 		Future<Map<String, Object>> future = executor.submit(new Callable<Map<String, Object>>()
 		{
 			@Override
 			public Map<String, Object> call() throws Exception
 			{
-				Map< String, Object> op = new LinkedHashMap<String, Object>();
-                op.put("action", "find");
-                op.put("db", "pint");
-                op.put("collection", "events");
-                op.put("matcher", matcher);
+				Map<String, Object> op = new LinkedHashMap<String, Object>();
+				op.put("action", "find");
+				op.put("db", "pint");
+				op.put("collection", "events");
+				op.put("matcher", matcher);
 				return MongoDBManager.getInstance().execOp(op);
 			}
 		});
-		future.addListener(new GenericFutureListener<Future<Map< String, Object>>>()
+		future.addListener(new GenericFutureListener<Future<Map<String, Object>>>()
 		{
 			@Override
-			public void operationComplete(Future<Map< String, Object>> future) throws Exception
+			public void operationComplete(Future<Map<String, Object>> future) throws Exception
 			{
-				if (!future.isSuccess() )
+				if (!future.isSuccess())
 				{
-					ctx.fireExceptionCaught(future.cause());
+					ctx.fireExceptionCaught(new NotyException(request, HttpResponseStatus.UNPROCESSABLE_ENTITY, future.cause()));
+					return;
 				}
 
-				Map< String, Object > event = future.get();
+				Map<String, Object> event = future.get();
 
 				HttpResponseStatus resp = HttpResponseStatus.OK;
 				String msg;
-				if( event == null ) {
+				if (event == null)
+				{
 					resp = HttpResponseStatus.INTERNAL_SERVER_ERROR;
 					msg = "Internal Server Error";
-				} else if( !event.get("status").equals( "ok") ) {
+					sendResponse(ctx, request, resp);
+				}
+				else if (!event.get("status").equals("ok"))
+				{
 					resp = HttpResponseStatus.INTERNAL_SERVER_ERROR;
-					msg = (String)event.get("message");
-				} else {
-					resp = HttpResponseStatus.OK;
-					msg = event.get("results").toString();
-				}
-				
-                // Build the response object
-                FullHttpResponse httpResponse = new DefaultFullHttpResponse(HTTP_1_1, resp, Unpooled.copiedBuffer(msg, CharsetUtil.UTF_8));
-                httpResponse.headers().set(CONTENT_TYPE, "application/json");
-                FullEncodedResponse encodedResponse = new FullEncodedResponse(request, httpResponse);
-                ctx.writeAndFlush(encodedResponse);
-			}
-		});
-	}
-
-	private void pubEvents(final ChannelHandlerContext ctx, final Request request)
-	{
-		l.debug("received request for publishing message !!!!");
-		FullHttpRequest httpRequest = request.getHttpRequest();
-
-		String jsonString = httpRequest.content().toString(CharsetUtil.UTF_8);
-		List< Object > tmp = null;
-		try
-		{
-			tmp = Utils.om.readValue( jsonString, new TypeReference< ArrayList< Object > >() {} );
-		}
-		catch (Exception e)
-		{
-			l.error("Json conversion error for events list");
-			ctx.fireExceptionCaught(e);
-			return;
-		}
-
-		final List< Object > eventList = tmp;
-		Future<Boolean> future = executor.submit(new Callable<Boolean>()
-		{
-			@Override
-			public Boolean call() throws Exception
-			{
-				try
-				{
-					Map< String, Object > op = new LinkedHashMap< String, Object >();
-					op.put("action", "save");
-					op.put("db", "pint");
-					op.put("collection", "events");
-					op.put("document", eventList);
-					MongoDBManager.getInstance().execOp(op);
-					return true;
-				}
-				catch (Exception e)
-				{
-					l.info("Error while inserting events!");
-					return false;
-				}
-			}
-		});
-		future.addListener(new GenericFutureListener<Future<Boolean>>()
-		{
-			@Override
-			public void operationComplete(Future<Boolean> future) throws Exception
-			{
-				boolean insertSuccess = future.get();
-				if (future.isSuccess() && insertSuccess)
-				{
-					// Build the response object
-					FullHttpResponse httpResponse = new DefaultFullHttpResponse(HTTP_1_1, OK);
-					FullEncodedResponse encodedResponse = new FullEncodedResponse(request, httpResponse);
-					ctx.writeAndFlush(encodedResponse);
+					msg = (String) event.get("message");
+					sendResponse(ctx, request, resp);
 				}
 				else
 				{
-					ctx.fireExceptionCaught(future.cause());
+					resp = HttpResponseStatus.OK;
+					msg = event.get("results").toString();
+					sendJsonResponse(ctx, request, resp, msg);
 				}
 			}
 		});
 	}
 
-	private Values handleRequestParams(Map<String, List<String>> requestParameters, Values values)
+	private void pubEvents(final ChannelHandlerContext ctx, final Request request) throws NotyException
 	{
-		for (Entry<String, List<String>> entry : requestParameters.entrySet())
+		l.debug("received request for publishing message !!!!");
+		FullHttpRequest httpRequest = request.getHttpRequest();
+		final List<Object> eventList;
+		try
 		{
-			String key = entry.getKey();
-			List<String> value = entry.getValue();
-			if (value.size() == 1)
-				values.put(key, value.get(0));
-			else
-				values.putStringList(key, value);
+			String jsonString = httpRequest.content().toString(CharsetUtil.UTF_8);
+			eventList = Utils.om.readValue(jsonString, new TypeReference<ArrayList<Object>>()
+			{
+			});
 		}
-		return values;
+		catch (Exception e)
+		{
+			l.error("Exception while json handling", e);
+			throw new NotyException(request, HttpResponseStatus.UNPROCESSABLE_ENTITY, e);
+		}
+		Future<Void> future = executor.submit(new Callable<Void>()
+		{
+			@Override
+			public Void call() throws JSONException, Exception
+			{
+				Map<String, Object> op = new LinkedHashMap<String, Object>();
+				op.put("action", "save");
+				op.put("db", "pint");
+				op.put("collection", "events");
+				op.put("document", eventList);
+				MongoDBManager.getInstance().execOp(op);
+				return null;
+			}
+		});
+		future.addListener(new GenericFutureListener<Future<Void>>()
+		{
+			@Override
+			public void operationComplete(Future<Void> future) throws Exception
+			{
+				if (future.isSuccess())
+				{
+					sendResponse(ctx, request, HttpResponseStatus.OK);
+				}
+				else
+				{
+					ctx.fireExceptionCaught(new NotyException(request, HttpResponseStatus.UNPROCESSABLE_ENTITY, future.cause()));
+				}
+			}
+		});
+	}
+
+	private void sendResponse(ChannelHandlerContext ctx, Request request, HttpResponseStatus status)
+	{
+		FullHttpResponse httpResponse = new DefaultFullHttpResponse(HTTP_1_1, status);
+		FullEncodedResponse encodedResponse = new FullEncodedResponse(request, httpResponse);
+		ctx.writeAndFlush(encodedResponse);
+	}
+
+	private void sendJsonResponse(ChannelHandlerContext ctx, Request request, HttpResponseStatus status, String content)
+	{
+		FullHttpResponse httpResponse = new DefaultFullHttpResponse(HTTP_1_1, OK, Unpooled.copiedBuffer(content, CharsetUtil.UTF_8));
+		httpResponse.headers().set(CONTENT_TYPE, "application/json");
+		FullEncodedResponse encodedResponse = new FullEncodedResponse(request, httpResponse);
+		ctx.writeAndFlush(encodedResponse);
 	}
 }

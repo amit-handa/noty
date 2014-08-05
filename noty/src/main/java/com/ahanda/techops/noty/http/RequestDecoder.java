@@ -1,6 +1,6 @@
 package com.ahanda.techops.noty.http;
 
-import com.ahanda.techops.noty.http.exception.BadRequestException;
+import com.ahanda.techops.noty.http.exception.NotyException;
 import com.ahanda.techops.noty.http.message.Request;
 
 import io.netty.channel.ChannelHandlerContext;
@@ -9,6 +9,7 @@ import io.netty.handler.codec.DecoderResult;
 import io.netty.handler.codec.http.FullHttpRequest;
 import io.netty.handler.codec.http.HttpObject;
 import io.netty.handler.codec.http.HttpRequest;
+import io.netty.handler.codec.http.HttpResponseStatus;
 
 public class RequestDecoder extends SimpleChannelInboundHandler<HttpObject>
 {
@@ -31,11 +32,10 @@ public class RequestDecoder extends SimpleChannelInboundHandler<HttpObject>
 	@Override
 	protected void channelRead0(ChannelHandlerContext ctx, HttpObject httpObject) throws Exception
 	{
-
 		DecoderResult result = httpObject.getDecoderResult();
 		if (!result.isSuccess())
 		{
-			throw new BadRequestException(result.cause());
+			throw new NotyException(HttpResponseStatus.BAD_REQUEST, result.cause());
 		}
 
 		if (httpObject instanceof FullHttpRequest)
