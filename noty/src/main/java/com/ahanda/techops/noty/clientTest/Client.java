@@ -36,6 +36,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.ahanda.techops.noty.Config;
+import com.fasterxml.jackson.databind.JsonNode;
 
 /**
  * A simple HTTP client that prints out the content of the HTTP response to {@link System#out} to test {@link HttpSnoopServer}.
@@ -48,10 +49,10 @@ public final class Client
 
 	public static void main(String[] args) throws Exception
 	{
-		JSONObject config = null; 
+		JsonNode config = null; 
 		try
 		{
-			config = Config.getInstance().get();
+			config = Config.getInstance().get().get("http");
 		}
 		catch (IOException e)
 		{
@@ -59,8 +60,8 @@ public final class Client
 			return;
 		}
 		String scheme = "http";
-		String host = config.getString("host");
-		int port = config.getInt("port");
+		String host = config.get("host").asText();
+		int port = config.get("port").asInt();
 
 		if (port == -1)
 		{

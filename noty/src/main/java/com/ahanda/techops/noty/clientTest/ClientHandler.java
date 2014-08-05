@@ -54,7 +54,7 @@ public class ClientHandler extends SimpleChannelInboundHandler<HttpObject>
         String contentStr = estr.toString();
 
         FullHttpRequest request = new DefaultFullHttpRequest(HttpVersion.HTTP_1_1, HttpMethod.POST,
-        		"/events/find", ch.alloc().buffer().writeBytes(contentStr.getBytes()));
+        		"/events/get", ch.alloc().buffer().writeBytes(contentStr.getBytes()));
 
         request.headers().set(HttpHeaders.Names.CONNECTION, HttpHeaders.Values.KEEP_ALIVE);
         request.headers().set(HttpHeaders.Names.ACCEPT_ENCODING, HttpHeaders.Values.GZIP);
