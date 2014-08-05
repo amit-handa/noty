@@ -9,25 +9,25 @@ import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.util.Set;
 
-import org.json.JSONObject;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 
 public class Config
 {
-	private JSONObject config;
-	private static JSONObject defconfig;
+	private ObjectNode config;
+	private static ObjectNode defconfig;
 	
 	static {
-		defconfig = new JSONObject()
-			.put("http", new JSONObject()
-                .put("host", "localhost")
-                .put("port", 8080 )
-                .put("maxRequestSize", 1048576 ) )
-             .put( "mongodb", new JSONObject()
-             	.put( "host", "localhost" )
-             	.put( "port", 27017 ) );
+		defconfig = Utils.om.createObjectNode();
+        defconfig.put("http", Utils.om.createObjectNode()
+            .put("host", "localhost")
+            .put("port", 8080 )
+            .put("maxRequestSize", 1048576 ) );
+         defconfig.put( "mongodb", Utils.om.createObjectNode()
+             .put( "host", "localhost" )
+             .put( "port", 27017 ) );
 	}
 
-	public static JSONObject getDefault() {
+	public static ObjectNode getDefault() {
 		return defconfig;
 	}
 
@@ -57,10 +57,10 @@ public class Config
 		File f = new File(configFile.getFile());
 		byte[] encoded = Files.readAllBytes(Paths.get(f.getAbsolutePath()));
 		String jsonStr = new String(encoded, Charset.defaultCharset());
-		config = new JSONObject(jsonStr);
+		config = Utils.om.readValue(jsonStr, ObjectNode.class );
 	}
 
-	public JSONObject get() {
+	public ObjectNode get() {
 		return config;
 	}
 

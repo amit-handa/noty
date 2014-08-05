@@ -18,22 +18,24 @@ import io.netty.util.concurrent.Future;
 import io.netty.util.concurrent.GenericFutureListener;
 
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.concurrent.Callable;
 
-import org.json.JSONArray;
-import org.json.JSONException;
-import org.json.JSONObject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.ahanda.techops.noty.Utils;
 import com.ahanda.techops.noty.db.MongoDBManager;
 import com.ahanda.techops.noty.http.message.FullEncodedResponse;
 import com.ahanda.techops.noty.http.message.Request;
+import com.fasterxml.jackson.core.type.TypeReference;
 
 /**
  * 
@@ -152,12 +154,12 @@ public class ServerHandler extends SimpleChannelInboundHandler<Request>
 		FullHttpRequest httpRequest = request.getHttpRequest();
 
 		String jsonString = httpRequest.content().toString(CharsetUtil.UTF_8);
-		final JSONObject userConf;
+		final Map< String, Object > userConf;
 		try
 		{
-			userConf = new JSONObject(jsonString);
+			userConf = Utils.om.readValue( jsonString, new TypeReference<HashMap< String, Object>>() {} );
 		}
-		catch (JSONException e)
+		catch (Exception e)
 		{
 			l.error("Json conversion error for user conf");
 			ctx.fireExceptionCaught(e);
@@ -206,7 +208,13 @@ public class ServerHandler extends SimpleChannelInboundHandler<Request>
 	{
 		FullHttpRequest httpRequest = request.getHttpRequest();
 
-		final JSONObject query = new JSONObject(httpRequest.content().toString(CharsetUtil.UTF_8));
+		Map< String, Object > tmp = null;
+		try {
+            tmp = Utils.om.readValue(httpRequest.content().toString(CharsetUtil.UTF_8), new TypeReference< Map< String, Object >>() {} );
+		} catch( Exception e ) {
+			ctx.fireExceptionCaught( e );
+		}
+		final Map< String, Object > query = tmp;
 		Future<String> future = executor.submit(new Callable<String>()
 		{
 			@Override
@@ -272,13 +280,21 @@ public class ServerHandler extends SimpleChannelInboundHandler<Request>
 	{
 		FullHttpRequest httpRequest = request.getHttpRequest();
 
-		final JSONObject matcher = new JSONObject(httpRequest.content().toString(CharsetUtil.UTF_8));
-		Future<JSONObject> future = executor.submit(new Callable<JSONObject>()
+		Map< String, Object > tmp = null;
+		try {
+			tmp = Utils.om.readValue(httpRequest.content().toString(CharsetUtil.UTF_8), new TypeReference< HashMap< String, Object >>() {} );
+		} catch( Exception e ) {
+			ctx.fireExceptionCaught( e );
+		}
+
+		final Map< String, Object > matcher = tmp;
+
+		Future<Map<String, Object>> future = executor.submit(new Callable<Map<String, Object>>()
 		{
 			@Override
-			public JSONObject call() throws Exception
+			public Map<String, Object> call() throws Exception
 			{
-				JSONObject op = new JSONObject();
+				Map< String, Object> op = new LinkedHashMap<String, Object>();
                 op.put("action", "find");
                 op.put("db", "pint");
                 op.put("collection", "events");
@@ -286,32 +302,31 @@ public class ServerHandler extends SimpleChannelInboundHandler<Request>
 				return MongoDBManager.getInstance().execOp(op);
 			}
 		});
-		future.addListener(new GenericFutureListener<Future<JSONObject>>()
+		future.addListener(new GenericFutureListener<Future<Map< String, Object>>>()
 		{
 			@Override
-			public void operationComplete(Future<JSONObject> future) throws Exception
+			public void operationComplete(Future<Map< String, Object>> future) throws Exception
 			{
 				if (!future.isSuccess() )
 				{
 					ctx.fireExceptionCaught(future.cause());
 				}
 
-				JSONObject event = future.get();
+				Map< String, Object > event = future.get();
 
 				HttpResponseStatus resp = HttpResponseStatus.OK;
 				String msg;
 				if( event == null ) {
 					resp = HttpResponseStatus.INTERNAL_SERVER_ERROR;
 					msg = "Internal Server Error";
-				} else if( !event.getString("status").equals( "ok") ) {
+				} else if( !event.get("status").equals( "ok") ) {
 					resp = HttpResponseStatus.INTERNAL_SERVER_ERROR;
-					msg = event.getString("message");
+					msg = (String)event.get("message");
 				} else {
 					resp = HttpResponseStatus.OK;
-					msg = event.getJSONArray("results").toString();
+					msg = event.get("results").toString();
 				}
 				
-
                 // Build the response object
                 FullHttpResponse httpResponse = new DefaultFullHttpResponse(HTTP_1_1, resp, Unpooled.copiedBuffer(msg, CharsetUtil.UTF_8));
                 httpResponse.headers().set(CONTENT_TYPE, "application/json");
@@ -327,17 +342,19 @@ public class ServerHandler extends SimpleChannelInboundHandler<Request>
 		FullHttpRequest httpRequest = request.getHttpRequest();
 
 		String jsonString = httpRequest.content().toString(CharsetUtil.UTF_8);
-		final JSONArray eventList;
+		List< Object > tmp = null;
 		try
 		{
-			eventList = new JSONArray(jsonString);
+			tmp = Utils.om.readValue( jsonString, new TypeReference< ArrayList< Object > >() {} );
 		}
-		catch (JSONException e)
+		catch (Exception e)
 		{
 			l.error("Json conversion error for events list");
 			ctx.fireExceptionCaught(e);
 			return;
 		}
+
+		final List< Object > eventList = tmp;
 		Future<Boolean> future = executor.submit(new Callable<Boolean>()
 		{
 			@Override
@@ -345,7 +362,7 @@ public class ServerHandler extends SimpleChannelInboundHandler<Request>
 			{
 				try
 				{
-					JSONObject op = new JSONObject();
+					Map< String, Object > op = new LinkedHashMap< String, Object >();
 					op.put("action", "save");
 					op.put("db", "pint");
 					op.put("collection", "events");
@@ -379,13 +396,6 @@ public class ServerHandler extends SimpleChannelInboundHandler<Request>
 				}
 			}
 		});
-	}
-
-	private void sendBadRequest(ChannelHandlerContext ctx, Request request)
-	{
-		FullHttpResponse httpResponse = new DefaultFullHttpResponse(HTTP_1_1, HttpResponseStatus.BAD_REQUEST);
-		FullEncodedResponse encodedResponse = new FullEncodedResponse(request, httpResponse);
-		ctx.writeAndFlush(encodedResponse);
 	}
 
 	private Values handleRequestParams(Map<String, List<String>> requestParameters, Values values)
