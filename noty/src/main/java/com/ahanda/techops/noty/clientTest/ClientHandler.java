@@ -16,16 +16,20 @@
 package com.ahanda.techops.noty.clientTest;
 
 import java.io.StringWriter;
+import java.util.Set;
 
 import org.json.JSONArray;
 import org.json.JSONObject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import io.netty.buffer.Unpooled;
 import io.netty.channel.Channel;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.SimpleChannelInboundHandler;
 import io.netty.handler.codec.http.ClientCookieEncoder;
+import io.netty.handler.codec.http.Cookie;
+import io.netty.handler.codec.http.CookieDecoder;
 import io.netty.handler.codec.http.DefaultCookie;
 import io.netty.handler.codec.http.DefaultFullHttpRequest;
 import io.netty.handler.codec.http.FullHttpRequest;
@@ -50,8 +54,9 @@ public class ClientHandler extends SimpleChannelInboundHandler<HttpObject>
 	int state = 0;	// 0 -> pub event, 1 -> getevent
 
 	static JSONObject getEvents = new JSONObject().put( "source", "PROD.Topaz" );
+	Set< Cookie > sessCookies = null;
 
-	private void getEvents(Channel ch) {
+	private void getEvents(Channel ch, FullHttpResponse resp ) {
         StringWriter estr = new StringWriter();
         getEvents.write(estr);
         String contentStr = estr.toString();
@@ -65,7 +70,7 @@ public class ClientHandler extends SimpleChannelInboundHandler<HttpObject>
 
         request.headers().set(HttpHeaders.Names.CONTENT_LENGTH, request.content().readableBytes());
         // Set some example cookies.
-        request.headers().set(HttpHeaders.Names.COOKIE, ClientCookieEncoder.encode(new DefaultCookie("userId", "ahanda"), new DefaultCookie("sessStart", "kal")));
+        request.headers().set(HttpHeaders.Names.COOKIE, ClientCookieEncoder.encode( sessCookies ) );
 
         l.info("getevents bytes {}", request.content().readableBytes());
 
@@ -85,15 +90,30 @@ public class ClientHandler extends SimpleChannelInboundHandler<HttpObject>
         request.headers().set(HttpHeaders.Names.CONTENT_TYPE, "application/json" );
 
         request.headers().set(HttpHeaders.Names.CONTENT_LENGTH, request.content().readableBytes());
-        // Set some example cookies.
-        request.headers().set(HttpHeaders.Names.COOKIE, ClientCookieEncoder.encode(new DefaultCookie("userId", "ahanda"), new DefaultCookie("sessStart", "kal")));
 
         l.info("readable bytes {}", request.content().readableBytes());
 
         // Send the HTTP request.
         ch.writeAndFlush(request);
 	}
-	public static void pubEvent( Channel ch, JSONObject e ) {
+
+    public void logout( Channel ch ) {
+        FullHttpRequest request = new DefaultFullHttpRequest(HttpVersion.HTTP_1_1, HttpMethod.DELETE,
+        		"/logout", Unpooled.buffer(0) );
+
+        request.headers().set(HttpHeaders.Names.CONNECTION, HttpHeaders.Values.KEEP_ALIVE);
+        request.headers().set(HttpHeaders.Names.ACCEPT_ENCODING, HttpHeaders.Values.GZIP);
+        request.headers().set(HttpHeaders.Names.CONTENT_TYPE, "application/json" );
+
+        request.headers().set(HttpHeaders.Names.CONTENT_LENGTH, 0 );
+
+        l.info("readable bytes {}", request.content().readableBytes());
+
+        // Send the HTTP request.
+        ch.writeAndFlush(request);
+	}
+
+	public void pubEvent( Channel ch, JSONObject e, FullHttpResponse resp ) {
         // Prepare the HTTP request.
         JSONArray es = new JSONArray();
         es.put( e );
@@ -110,7 +130,7 @@ public class ClientHandler extends SimpleChannelInboundHandler<HttpObject>
 
         request.headers().set(HttpHeaders.Names.CONTENT_LENGTH, request.content().readableBytes());
         // Set some example cookies.
-        request.headers().set(HttpHeaders.Names.COOKIE, ClientCookieEncoder.encode(new DefaultCookie("userId", "ahanda"), new DefaultCookie("sessStart", "kal")));
+        request.headers().set(HttpHeaders.Names.COOKIE, ClientCookieEncoder.encode( sessCookies ) );
 
         l.info("readable bytes {}", request.content().readableBytes());
 
@@ -168,8 +188,20 @@ public class ClientHandler extends SimpleChannelInboundHandler<HttpObject>
 			}
 		}
 		
-		if( state == 1 ) {
-			getEvents( ctx.channel() );
+		switch( state ) {
+		case 1:
+			FullHttpResponse resp = (FullHttpResponse)msg;
+            sessCookies = CookieDecoder.decode(resp.headers().get( HttpHeaders.Names.SET_COOKIE ) );
+			pubEvent( ctx.channel(), event, (FullHttpResponse)msg );
+			break;
+		case 2:
+			getEvents( ctx.channel(), (FullHttpResponse)msg );
+			break;
+		case 3:
+			logout( ctx.channel() );
+			break;
+		default:
+			break;
 		}
 	}
 

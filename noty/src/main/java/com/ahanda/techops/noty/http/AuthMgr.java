@@ -1,7 +1,6 @@
 package com.ahanda.techops.noty.http;
 
 import java.util.*; // arraylist
-import java.io.*; // file/object input/output stream, bufferredreader/writer
 import java.nio.file.*; //Path,paths,files;
 import java.nio.charset.Charset;
 import java.net.URL;
@@ -10,6 +9,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import ch.qos.logback.classic.LoggerContext;
+import io.netty.buffer.Unpooled;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.SimpleChannelInboundHandler;
 import io.netty.handler.codec.http.ClientCookieEncoder;
@@ -51,8 +51,7 @@ public class AuthMgr extends SimpleChannelInboundHandler<Request>
 	private Map<String, UserInfo> userInfos = new HashMap<String, UserInfo>();
 
 	private Set<String> invalidSessions = new HashSet<String>();
-
-	private static volatile int refdur = 500000; // .5 secs
+	private static Set< Cookie > nocookies = new HashSet< Cookie >();
 
 	public AuthMgr()
 	{
@@ -75,8 +74,8 @@ public class AuthMgr extends SimpleChannelInboundHandler<Request>
 			if( tmp != null )
 				macAlgoName = tmp.asText();
 
-			validityWindow = defconfig.get( NotyConstants.HTTP_SESSIONS_VALIDITY ).asLong();
-			tmp = config.get( NotyConstants.HTTP_SESSIONS_VALIDITY );
+			validityWindow = defconfig.get("http").get( NotyConstants.HTTP_SESSIONS_VALIDITY ).asLong();
+			tmp = config.get( "http" ).get( NotyConstants.HTTP_SESSIONS_VALIDITY );
 			if( tmp != null )
 				validityWindow = tmp.asLong();
 
@@ -159,37 +158,10 @@ public class AuthMgr extends SimpleChannelInboundHandler<Request>
 		HttpMethod accessMethod = httpReq.getMethod();
 
         String cookiestr = httpReq.headers().get( HttpHeaders.Names.COOKIE );
-        Set< Cookie > cookies = CookieDecoder.decode( cookiestr );
-		if (path.matches("/login") && accessMethod == HttpMethod.POST ) {
-            String body = httpReq.content().toString( CharsetUtil.UTF_8 );
-
-			logger.info("Login request: {}", path);
-			Map< String, String > credentials = Utils.om.readValue( body, new TypeReference< Map< String, String > >() {} );
-            String userId = credentials.get("userId");
-
-            if (userId == null) { // authenticate userId
-                logger.debug("Cannot validate User {}, Fix it, continuing as usual !" );
-                // return null;
-            }
-    
-            long sessStart = System.currentTimeMillis() / 1000L;
-            String sessid = getSessId( mac, userId, sessStart );
-
-            FullHttpResponse resp = request.setResponse( HttpResponseStatus.OK, null );
-            for( Cookie reqcookie : cookies ) {
-            	reqcookie.setMaxAge( 0 );
-            }
-            Cookie sessIdCookie = new DefaultCookie( "sessId", sessid );
-            sessIdCookie.setHttpOnly( true );
-            sessIdCookie.setPath("/");
-            cookies.remove( sessIdCookie );
-
-            sessIdCookie.setMaxAge( sessStart + validityWindow );
-            cookies.add( sessIdCookie );
-
-            resp.headers().set( HttpHeaders.Names.SET_COOKIE, ClientCookieEncoder.encode( cookies ) );
-        }
-
+        Set< Cookie > cookies = nocookies;
+        if( cookiestr != null )
+            cookies = CookieDecoder.decode( cookiestr );
+		
 		logger.info("Intercepted msg : headers {} {} {}!!!", path, cookies);
 
 		Cookie sessIdc = null, userIdc = null, sessStartc = null;
@@ -209,19 +181,71 @@ public class AuthMgr extends SimpleChannelInboundHandler<Request>
 			}
 		}
 
-		if ( sessIdc == null ) { // invalid request, opensession first
+		String sessId = null, userId = null;
+		long sessStart = -1;
+        if (path.matches("/login") && accessMethod == HttpMethod.POST ) {
+            String body = httpReq.content().toString( CharsetUtil.UTF_8 );
+
+			logger.info("Login request: {}", path);
+			Map< String, String > credentials = Utils.om.readValue( body, new TypeReference< Map< String, String > >() {} );
+            userId = credentials.get("userId");
+
+            if (userId == null) { // authenticate userId
+                logger.debug("Cannot validate User {}, Fix it, continuing as usual !" );
+                // return null;
+            }
+    
+            sessStart = System.currentTimeMillis() / 1000L;
+            sessId = getSessId( mac, userId, sessStart );
+
+            FullHttpResponse resp = request.setResponse( HttpResponseStatus.OK, Unpooled.buffer(0) );
+            for( Cookie reqcookie : cookies ) {
+            	reqcookie.setMaxAge( 0 );
+            }
+
+            sessIdc = new DefaultCookie( "sessId", sessId );
+            sessIdc.setHttpOnly( true );
+            sessIdc.setPath("/");
+            cookies.remove( sessIdc );
+
+            sessIdc.setMaxAge( sessStart + validityWindow );
+            cookies.add( sessIdc );
+
+            sessStartc = new DefaultCookie( "sessStart", Long.toString(sessStart) );
+            sessStartc.setHttpOnly( true );
+            sessStartc.setPath("/");
+            cookies.remove( sessStartc );
+
+            sessIdc.setMaxAge( sessStart + validityWindow );
+            cookies.add( sessStartc );
+
+            userIdc = new DefaultCookie( "userId", userId );
+            userIdc.setHttpOnly( true );
+            userIdc.setPath("/");
+            cookies.remove( userIdc );
+
+            userIdc.setMaxAge( sessStart + validityWindow );
+            cookies.add( userIdc );
+
+            resp.headers().set( HttpHeaders.Names.SET_COOKIE, ClientCookieEncoder.encode( cookies ) );
+            ctx.writeAndFlush( new FullEncodedResponse( request, resp ));
+            return;
+        }
+        
+        if (sessIdc == null && userIdc == null && sessStartc == null ) { // invalid request, opensession first
 			logger.error("Invalid request, session doesnt exist!");
             FullHttpResponse resp = request.setResponse(HttpResponseStatus.UNAUTHORIZED, ctx.alloc().buffer().writeBytes("Authorization absent, kindly sign-in first".getBytes() ) );
             ctx.writeAndFlush(new FullEncodedResponse( request, resp ));
 			return;
 		}
 
+        if( sessId == null )
+            sessId = sessIdc.getValue();
+		if( userId == null )
+            userId = userIdc.getValue();
+		if( sessStart < 0 )
+            sessStart = Long.valueOf( sessStartc.getValue() );
 		
-		assert (sessIdc != null && userIdc != null && sessStartc != null);
-
-		String sessId = sessIdc.getValue();
-		String userId = userIdc.getValue();
-		long sessStart = Long.valueOf( sessStartc.getValue() );
 		String csessid = getSessId( mac, userId, sessStart );
 
 		if (!csessid.equals(sessId))
@@ -240,19 +264,15 @@ public class AuthMgr extends SimpleChannelInboundHandler<Request>
 			return;
 		}
 
-		if (path.matches("/logout"))
-		{
-			if (accessMethod.equals("DELETE"))
-			{
-				invalidSessions.add(sessId);
-                FullHttpResponse resp = request.setResponse(HttpResponseStatus.OK, ctx.alloc().buffer().writeBytes( "Session Deleted Successfully".getBytes() ) );
-                ctx.writeAndFlush( new FullEncodedResponse( request, resp ) );
-				return;
-			}
+		if (path.matches("/logout") && accessMethod == HttpMethod.DELETE ) {
+            invalidSessions.add(sessId);
+            FullHttpResponse resp = request.setResponse(HttpResponseStatus.OK, ctx.alloc().buffer().writeBytes( "Session Deleted Successfully".getBytes() ) );
+            ctx.writeAndFlush( new FullEncodedResponse( request, resp ) );
+            return;
 		}
 
 		httpReq.headers().set("userId", userId );
-		httpReq.headers().set("sessStart", new Long( sessStart ).toString() );
+		httpReq.headers().set("sessStart", Long.toString( sessStart ) );
 		ctx.fireChannelRead( request );
 	}
 }

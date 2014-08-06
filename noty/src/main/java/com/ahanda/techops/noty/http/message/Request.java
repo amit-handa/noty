@@ -49,7 +49,7 @@ public class Request
 		if( httpResponse != null )
 			return null;
 
-        httpResponse = new DefaultFullHttpResponse( httpRequest.getProtocolVersion(), HttpResponseStatus.CREATED, buf );
+        httpResponse = new DefaultFullHttpResponse( httpRequest.getProtocolVersion(), status, buf );
         return httpResponse;
 	}
 }
