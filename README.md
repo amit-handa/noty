@@ -4,3 +4,4 @@ EventServer project using netty library. At the moment, only the tutorial mentio
 
 http://netty.io/wiki/user-guide-for-4.x.html
 
+Nice git branching model: http://nvie.com/posts/a-successful-git-branching-model/
