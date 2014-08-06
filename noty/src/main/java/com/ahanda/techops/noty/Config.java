@@ -18,6 +18,10 @@ public class Config
 	
 	static {
 		defconfig = Utils.om.createObjectNode();
+
+        defconfig.put("macAlgoName", "HmacSHA256" );
+        defconfig.put( "sessKey", "NQtV5zDQjVqg9vofDSEmX7WA+wXhBhjaxengpeyFh7AANWoMEPe+qebTViYb7db6fAEJJK+tWP8KEh4J10PAFQ==" );
+
         defconfig.put("http", Utils.om.createObjectNode()
             .put("host", "localhost")
             .put("port", 8080 )

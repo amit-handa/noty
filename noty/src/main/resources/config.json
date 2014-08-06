@@ -1,4 +1,7 @@
 {
+	"macAlgoName" : "HmacSHA256",
+	"sessKey" : "NQtV5zDQjVqg9vofDSEmX7WA+wXhBhjaxengpeyFh7AANWoMEPe+qebTViYb7db6fAEJJK+tWP8KEh4J10PAFQ==",
+
 	"http":{	
 		"host" : "localhost",
 		"port" : 8080,
