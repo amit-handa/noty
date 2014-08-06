@@ -8,11 +8,16 @@ public class NotyConstants
 
 	public static final String PUBLISH_EVENT = "publish_event";
 
+    public static final String MAC_ALGO_NAME = "macAlgoName";
+    public static final String SESS_KEY = "sessKey";
+
     public static final String HOST = "host";
 
     public static final String PORT = "port";
 
     public static final String HTTP_MAX_REQUEST_SIZE = "maxRequestSize";
+
+	public static final String HTTP_SESSIONS_VALIDITY = "sessValidityWindow";
 
     public static class MONGODB
     {

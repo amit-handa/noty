@@ -114,6 +114,7 @@ public final class Client
 			// Make the connection attempt.
 			Channel ch = b.connect(host, port).sync().channel();
 
+			ClientHandler.login( ch, ClientHandler.event );
 			ClientHandler.pubEvent( ch, ClientHandler.event );
 
 			// Wait for the server to close the connection.

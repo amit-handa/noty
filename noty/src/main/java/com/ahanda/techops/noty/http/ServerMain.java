@@ -102,6 +102,7 @@ public class ServerMain
 							chp.addLast("aggregator", new HttpObjectAggregator( maxRequestSize ) );
 							chp.addLast("pintRequestDecoder", new RequestDecoder());
 							chp.addLast("httpPayloadEncoder", new ResponseEncoder());
+							chp.addLast("authMgr", new AuthMgr() );
 							chp.addLast("httpPayloadDecoder", new ServerHandler(group));
 							chp.addLast("httpExceptionHandler", new DefaultExceptionHandler());
 						}

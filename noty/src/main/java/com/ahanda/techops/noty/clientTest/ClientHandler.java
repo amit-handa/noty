@@ -42,8 +42,11 @@ import io.netty.util.CharsetUtil;
 public class ClientHandler extends SimpleChannelInboundHandler<HttpObject>
 {
 	static final Logger l = LoggerFactory.getLogger(ClientHandler.class );
+	static JSONObject credential = new JSONObject().put("userId", "ahanda" ).put( "password", "ahandaPwd");
+
 	static JSONObject event = new JSONObject().put("id", "Ping").put("type", "SecSyncer").put("source", "PROD.Topaz").put("etime", System.currentTimeMillis() / 1000L)
         .put("status", "OK").put("message", "Up Since last 15 minutes");
+
 	int state = 0;	// 0 -> pub event, 1 -> getevent
 
 	static JSONObject getEvents = new JSONObject().put( "source", "PROD.Topaz" );
@@ -70,6 +73,26 @@ public class ClientHandler extends SimpleChannelInboundHandler<HttpObject>
         ch.writeAndFlush(request);
 	}
 
+    public static void login( Channel ch, JSONObject credential ) {
+        StringWriter estr = new StringWriter();
+        credential.write(estr);
+        String contentStr = estr.toString();
+        FullHttpRequest request = new DefaultFullHttpRequest(HttpVersion.HTTP_1_1, HttpMethod.POST,
+        		"/login", ch.alloc().buffer().writeBytes(contentStr.getBytes()));
+
+        request.headers().set(HttpHeaders.Names.CONNECTION, HttpHeaders.Values.KEEP_ALIVE);
+        request.headers().set(HttpHeaders.Names.ACCEPT_ENCODING, HttpHeaders.Values.GZIP);
+        request.headers().set(HttpHeaders.Names.CONTENT_TYPE, "application/json" );
+
+        request.headers().set(HttpHeaders.Names.CONTENT_LENGTH, request.content().readableBytes());
+        // Set some example cookies.
+        request.headers().set(HttpHeaders.Names.COOKIE, ClientCookieEncoder.encode(new DefaultCookie("userId", "ahanda"), new DefaultCookie("sessStart", "kal")));
+
+        l.info("readable bytes {}", request.content().readableBytes());
+
+        // Send the HTTP request.
+        ch.writeAndFlush(request);
+	}
 	public static void pubEvent( Channel ch, JSONObject e ) {
         // Prepare the HTTP request.
         JSONArray es = new JSONArray();
