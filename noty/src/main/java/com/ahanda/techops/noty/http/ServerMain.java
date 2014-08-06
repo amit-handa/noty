@@ -35,9 +35,11 @@ import com.fasterxml.jackson.databind.node.ObjectNode;
 public class ServerMain
 {
 	private ObjectNode config;
+
 	private ObjectNode defconfig = Config.getDefault();
 
 	private String host;
+
 	private int port;
 
 	private static final Logger l = LoggerFactory.getLogger(ServerMain.class);
@@ -64,25 +66,26 @@ public class ServerMain
 			return;
 		}
 
-		final JsonNode httpconfig = config.get( "http" );
-		JsonNode defhttpconfig = config.get( "http" );
+		final JsonNode httpconfig = config.get("http");
+		JsonNode defhttpconfig = config.get("http");
 
-        host = defhttpconfig.get( HOST ).asText();
-        port = defhttpconfig.get( PORT ).asInt();
-        int mreqsize = defhttpconfig.get( HTTP_MAX_REQUEST_SIZE ).asInt();
-		if( httpconfig != null ) {
-            JsonNode tmp = httpconfig.get(HOST);
+		host = defhttpconfig.get(HOST).asText();
+		port = defhttpconfig.get(PORT).asInt();
+		int mreqsize = defhttpconfig.get(HTTP_MAX_REQUEST_SIZE).asInt();
+		if (httpconfig != null)
+		{
+			JsonNode tmp = httpconfig.get(HOST);
 			host = tmp != null ? tmp.asText() : host;
 
-            tmp = httpconfig.get(PORT);
+			tmp = httpconfig.get(PORT);
 			port = tmp != null ? tmp.asInt() : port;
 
-            tmp = httpconfig.get(HTTP_MAX_REQUEST_SIZE);
+			tmp = httpconfig.get(HTTP_MAX_REQUEST_SIZE);
 			mreqsize = tmp != null ? tmp.asInt() : port;
 		}
 		final int maxRequestSize = mreqsize;
 
-		l.info("creating server on {} {}", host, port );
+		l.info("creating server on {} {}", host, port);
 		final DefaultEventExecutorGroup group = new DefaultEventExecutorGroup(100);
 		EventLoopGroup bossGroup = new NioEventLoopGroup();
 		EventLoopGroup workerGroup = new NioEventLoopGroup();
@@ -99,7 +102,7 @@ public class ServerMain
 							ChannelPipeline chp = ch.pipeline();
 							chp.addLast("decoder", new HttpRequestDecoder());
 							chp.addLast("encoder", new HttpResponseEncoder());
-							chp.addLast("aggregator", new HttpObjectAggregator( maxRequestSize ) );
+							chp.addLast("aggregator", new HttpObjectAggregator(maxRequestSize));
 							chp.addLast("pintRequestDecoder", new RequestDecoder());
 							chp.addLast("httpPayloadEncoder", new ResponseEncoder());
 							chp.addLast("httpPayloadDecoder", new ServerHandler(group));
@@ -110,7 +113,7 @@ public class ServerMain
 			l.info("Created server on port {}", port);
 
 			// Bind and start to accept incoming connections.
-			ChannelFuture f = b.bind(host,port).sync(); // (7)
+			ChannelFuture f = b.bind(host, port).sync(); // (7)
 
 			// Wait until the server socket is closed.
 			// In this example, this does not happen, but you can do that to

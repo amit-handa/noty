@@ -27,8 +27,6 @@ import com.ahanda.techops.noty.http.message.FullEncodedResponse;
 public class ResponseEncoder extends ChannelOutboundHandlerAdapter
 {
 
-	private static final String SESSION_COOKIE_NAME = "JSESSIOINID";
-
 	private static final SecureRandom random = new SecureRandom();
 
 	private final Map<Long, HttpResponse> pendingResponses = new HashMap<>();
@@ -98,8 +96,4 @@ public class ResponseEncoder extends ChannelOutboundHandlerAdapter
 			ctx.flush();
 	}
 
-	private String nextSessionId()
-	{
-		return new BigInteger(130, random).toString(32);
-	}
 }
