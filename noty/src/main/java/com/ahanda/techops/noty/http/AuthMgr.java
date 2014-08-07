@@ -60,8 +60,6 @@ public class AuthMgr extends SimpleChannelInboundHandler<Request>
 
 	private static Mac mac;
 
-	private Set<String> invalidSessions = new HashSet<String>();
-
 	private static Set<Cookie> nocookies = new HashSet<Cookie>();
 
 	/**
@@ -244,7 +242,7 @@ public class AuthMgr extends SimpleChannelInboundHandler<Request>
 		}
 
 		long elapseSecs = System.currentTimeMillis() / 1000L - sessStart;
-		if (invalidSessions.contains(sessId) || elapseSecs > Config.getInstance().getValidityWindow())
+		if (elapseSecs > Config.getInstance().getValidityWindow())
 		{
 			sendResponse(ctx, request, HttpResponseStatus.UNAUTHORIZED, String.format(SESSION_EXPIRED, elapseSecs));
 			return;
@@ -252,8 +250,8 @@ public class AuthMgr extends SimpleChannelInboundHandler<Request>
 
 		if (path.matches("/logout") && accessMethod == HttpMethod.DELETE)
 		{
-			invalidSessions.add(sessId);
 			sendResponse(ctx, request, HttpResponseStatus.OK, SESSION_DELETED);
+			ctx.close();
 			return;
 		}
 
