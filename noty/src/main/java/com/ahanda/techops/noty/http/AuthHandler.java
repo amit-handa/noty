@@ -59,8 +59,6 @@ public class AuthHandler extends SimpleChannelInboundHandler<Request>
 
 	private static SecretKeySpec sks;
 
-	private static Set<Cookie> nocookies = new HashSet<Cookie>();
-
 	/**
 	 * All the security stuff should be common for all the channels, and should be instantiated before processing
 	 */
@@ -155,7 +153,7 @@ public class AuthHandler extends SimpleChannelInboundHandler<Request>
 		if (cookiestr != null)
 			cookies = CookieDecoder.decode(cookiestr);
 		else
-			cookies = nocookies;
+			cookies = new HashSet<Cookie>(0);
 
 		logger.info("Intercepted msg : headers {} {} {}!!!", path, cookies);
 
