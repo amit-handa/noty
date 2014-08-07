@@ -14,6 +14,7 @@ import io.netty.handler.codec.http.HttpResponseStatus;
 import io.netty.handler.codec.http.ServerCookieEncoder;
 import io.netty.util.CharsetUtil;
 
+import java.io.IOException;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
@@ -54,7 +55,9 @@ public class AuthHandler extends SimpleChannelInboundHandler<Request>
 
 	private static String PUBLISHER_KEY = "Fh7AANW";
 
-	private static Mac mac;
+	private Mac mac;
+
+	private static SecretKeySpec sks;
 
 	private static Set<Cookie> nocookies = new HashSet<Cookie>();
 
@@ -65,16 +68,31 @@ public class AuthHandler extends SimpleChannelInboundHandler<Request>
 	{
 		try
 		{
-			String MAC_ALGO_NAME = Config.getInstance().getMacAlgoName();
-			String SECRET_KEY = Config.getInstance().getSecretKey();
-			mac = Mac.getInstance(MAC_ALGO_NAME);
-			SecretKeySpec sks = new SecretKeySpec(SECRET_KEY.getBytes(), MAC_ALGO_NAME);
-			mac.init(sks);
-			logger.info("Inited ! {} {}", new Object[] { SECRET_KEY, mac });
+			String macAlgoName = Config.getInstance().getMacAlgoName();
+			String secretKey = Config.getInstance().getSecretKey();
+			sks = new SecretKeySpec(secretKey.getBytes(), macAlgoName);
+		}
+		catch (IllegalArgumentException | IOException exc)
+		{
+			logger.warn("Exception while instantiating SecretKeySpec : {} {}", exc.getMessage(), exc.getStackTrace());
+		}
+	}
+
+	public void initMac()
+	{
+		try
+		{
+			/* If MAC is null then init it else reuse the same mac object*/
+			if (mac == null)
+			{
+				mac = Mac.getInstance(sks.getAlgorithm());
+				mac.init(sks);
+				logger.info("Mac Initiated ! {} {}", new Object[] { sks.getEncoded(), mac });
+			}
 		}
 		catch (Exception exc)
 		{
-			logger.warn("Exception found: {} {}", exc.getMessage(), exc.getStackTrace());
+			logger.warn("Exception while init MAC : {} {}", exc.getMessage(), exc.getStackTrace());
 		}
 	}
 
@@ -83,7 +101,7 @@ public class AuthHandler extends SimpleChannelInboundHandler<Request>
 		super(false);
 	}
 
-	public static Map<String, Object> checkCredential(final Map<String, Object> msg)
+	public Map<String, Object> checkCredential(final Map<String, Object> msg)
 	{
 		String userId = (String) msg.get("userId");
 		String password = (String) msg.get("password");
@@ -113,9 +131,10 @@ public class AuthHandler extends SimpleChannelInboundHandler<Request>
 		return msg;
 	}
 
-	public static String getSessId(String userId, long sessStart)
+	public String getSessId(String userId, long sessStart)
 	{
 		String cval = String.format("%s&%d", userId, sessStart);
+		initMac();
 		return new String(Base64.encodeBase64(mac.doFinal(cval.getBytes())));
 	}
 
