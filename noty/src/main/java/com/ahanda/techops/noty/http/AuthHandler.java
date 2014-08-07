@@ -80,7 +80,7 @@ public class AuthHandler extends SimpleChannelInboundHandler<Request>
 	{
 		try
 		{
-			/* If MAC is null then init it else reuse the same mac object*/
+			/* If MAC is null then init it else reuse the same mac object */
 			if (mac == null)
 			{
 				mac = Mac.getInstance(sks.getAlgorithm());
@@ -148,31 +148,31 @@ public class AuthHandler extends SimpleChannelInboundHandler<Request>
 		String path = request.getRequestPath();
 		HttpMethod accessMethod = httpReq.getMethod();
 
-		String cookiestr = httpReq.headers().get(HttpHeaders.Names.COOKIE);
-		Set<Cookie> cookies;
-		if (cookiestr != null)
-			cookies = CookieDecoder.decode(cookiestr);
-		else
-			cookies = new HashSet<Cookie>(0);
-
-		logger.info("Intercepted msg : headers {} {} {}!!!", path, cookies);
-
 		Cookie sessIdc = null, userIdc = null, sessStartc = null;
-		for (Cookie c : cookies)
+		String cookiestr = httpReq.headers().get(HttpHeaders.Names.COOKIE);
+		Set<Cookie> cookies = null;
+
+		if (cookiestr != null)
 		{
-			switch (c.getName())
+			cookies = CookieDecoder.decode(cookiestr);
+			logger.info("Intercepted msg : headers {} {} {}!!!", path, cookies);
+			
+			for (Cookie c : cookies)
 			{
-			case "sessId":
-				sessIdc = c;
-				break;
-			case "userId":
-				userIdc = c;
-				break;
-			case "sessStart":
-				sessStartc = c;
-				break;
-			default:
-				break;
+				switch (c.getName())
+				{
+				case "sessId":
+					sessIdc = c;
+					break;
+				case "userId":
+					userIdc = c;
+					break;
+				case "sessStart":
+					sessStartc = c;
+					break;
+				default:
+					break;
+				}
 			}
 		}
 
@@ -180,6 +180,9 @@ public class AuthHandler extends SimpleChannelInboundHandler<Request>
 		long sessStart = -1;
 		if (path.matches("/login") && accessMethod == HttpMethod.POST)
 		{
+			if(cookies == null)
+				cookies = new HashSet<Cookie>();
+			
 			String body = httpReq.content().toString(CharsetUtil.UTF_8);
 			logger.info("Login request: {}", path);
 			Map<String, String> credentials = Utils.om.readValue(body, new TypeReference<Map<String, String>>()
