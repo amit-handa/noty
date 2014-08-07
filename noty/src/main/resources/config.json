@@ -9,7 +9,7 @@
 		"sessValidityWindow" : 3600
 	},
 	"mongodb": {
-		"host" : "192.168.1.18",
+		"host" : "localhost",
 		"port" : 27017,
         "pint" : {	
                 "events" : {
