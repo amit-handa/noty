@@ -53,8 +53,6 @@ public class AuthHandler extends SimpleChannelInboundHandler<Request>
 
 	private static String NOT_AUTHORIZED = "Authorization absent, kindly sign-in first";
 
-	private static String PUBLISHER_KEY = "Fh7AANW";
-
 	private Mac mac;
 
 	private static SecretKeySpec sks;
@@ -70,7 +68,7 @@ public class AuthHandler extends SimpleChannelInboundHandler<Request>
 			String secretKey = Config.getInstance().getSecretKey();
 			sks = new SecretKeySpec(secretKey.getBytes(), macAlgoName);
 		}
-		catch (IllegalArgumentException | IOException exc)
+		catch (IllegalArgumentException exc)
 		{
 			logger.warn("Exception while instantiating SecretKeySpec : {} {}", exc.getMessage(), exc.getStackTrace());
 		}
@@ -277,10 +275,10 @@ public class AuthHandler extends SimpleChannelInboundHandler<Request>
 		ctx.fireChannelRead(request);
 	}
 
-	private boolean reqValid(Request request)
+	private boolean reqValid(Request request) throws IOException
 	{
 		String token = request.getHttpRequest().headers().get("auth-token");
-		if (PUBLISHER_KEY.equals(token))
+		if (Config.getInstance().getAuthToken().equals(token))
 			return true;
 		return false;
 	}

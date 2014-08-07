@@ -57,6 +57,8 @@ public class ServerMain
 	{
 		try
 		{
+			Config cf = Config.getInstance();
+			cf.setupConfig();
 			config = Config.getInstance().get();
 		}
 		catch (IOException e)
