@@ -1,90 +1,78 @@
 package com.ahanda.techops.noty.http;
 
-import java.util.*; // arraylist
-import java.nio.file.*; //Path,paths,files;
-import java.nio.charset.Charset;
-import java.net.URL;
-
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
-import ch.qos.logback.classic.LoggerContext;
-import io.netty.buffer.Unpooled;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.SimpleChannelInboundHandler;
-import io.netty.handler.codec.http.ClientCookieEncoder;
 import io.netty.handler.codec.http.Cookie;
 import io.netty.handler.codec.http.CookieDecoder;
 import io.netty.handler.codec.http.DefaultCookie;
+import io.netty.handler.codec.http.DefaultFullHttpResponse;
 import io.netty.handler.codec.http.FullHttpRequest;
 import io.netty.handler.codec.http.FullHttpResponse;
 import io.netty.handler.codec.http.HttpHeaders;
 import io.netty.handler.codec.http.HttpMethod;
 import io.netty.handler.codec.http.HttpResponseStatus;
+import io.netty.handler.codec.http.ServerCookieEncoder;
 import io.netty.util.CharsetUtil;
 
-import javax.crypto.*; //Mac
-import javax.crypto.spec.*; //SecretKeySpec
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Map;
+import java.util.Set;
+
+import javax.crypto.Mac;
+import javax.crypto.spec.SecretKeySpec;
 
 import org.apache.commons.codec.binary.Base64;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import com.ahanda.techops.noty.Config;
-import com.ahanda.techops.noty.NotyConstants;
 import com.ahanda.techops.noty.Utils;
 import com.ahanda.techops.noty.http.message.FullEncodedResponse;
 import com.ahanda.techops.noty.http.message.Request;
 import com.fasterxml.jackson.core.type.TypeReference;
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.node.ObjectNode;
 
+/**
+ * 
+ * This class handles the authorization for the request. For publishers, an auth key should be there in the header in
+ * every request using which, request is granted. For subscribers, a cookie should be set in the header to validate the
+ * request. If the validation fails, server will create the cookie while user login
+ *
+ */
 public class AuthMgr extends SimpleChannelInboundHandler<Request>
 {
 	// process all the uconfs and populate user-data
 	private static final Logger logger = LoggerFactory.getLogger(AuthMgr.class);
 
-	private Mac mac;
+	private static String UNAUTH_ACCESS = "Unauthorized access: kindly sign-in again";
 
-	private String secretKey; // $TRDATADIR
+	private static String SESSION_EXPIRED = "Session Expired : %d";
 
-	private long validityWindow;
+	private static String SESSION_DELETED = "Session Deleted Successfully";
 
-	private Map<String, UserInfo> userInfos = new HashMap<String, UserInfo>();
+	private static String NOT_AUTHORIZED = "Authorization absent, kindly sign-in first";
+
+	private static String MAC_ALGO_NAME = "HmacSHA256";
+
+	private static String SECRET_KEY = "NQtV5zDQjVqg9vofDSEmX7WA+wXhBhjaxengpeyFh7AANWoMEPe+qebTViYb7db6fAEJJK+tWP8KEh4J10PAFQ==";
+
+	private static String PUBLISHER_KEY = "Fh7AANW";
+
+	private static Mac mac;
 
 	private Set<String> invalidSessions = new HashSet<String>();
 
 	private static Set<Cookie> nocookies = new HashSet<Cookie>();
 
-	public AuthMgr()
-	{
-		// Do not autorelease HttpObject since
-		// it is passed through
-		super(false);
-
-		doInit();
-	}
-
-	public void doInit()
+	/**
+	 * All the security stuff should be common for all the channels, and should be instantiated before processing
+	 */
+	static
 	{
 		try
 		{
-			ObjectNode config = Config.getInstance().get();
-			ObjectNode defconfig = Config.getDefault();
-			String macAlgoName = defconfig.get(NotyConstants.MAC_ALGO_NAME).asText();
-
-			JsonNode tmp = config.get(NotyConstants.MAC_ALGO_NAME);
-			if (tmp != null)
-				macAlgoName = tmp.asText();
-
-			validityWindow = defconfig.get("http").get(NotyConstants.HTTP_SESSIONS_VALIDITY).asLong();
-			tmp = config.get("http").get(NotyConstants.HTTP_SESSIONS_VALIDITY);
-			if (tmp != null)
-				validityWindow = tmp.asLong();
-
-			mac = Mac.getInstance(macAlgoName);
-
-			secretKey = config.get(NotyConstants.SESS_KEY).asText();
-
-			SecretKeySpec sks = new SecretKeySpec(secretKey.getBytes(), macAlgoName);
+			mac = Mac.getInstance(MAC_ALGO_NAME);
+			SecretKeySpec sks = new SecretKeySpec(SECRET_KEY.getBytes(), MAC_ALGO_NAME);
 			mac.init(sks);
 		}
 		catch (Exception exc)
@@ -92,34 +80,15 @@ public class AuthMgr extends SimpleChannelInboundHandler<Request>
 			logger.warn("Exception found: {} {}", exc.getMessage(), exc.getStackTrace());
 		}
 
-		logger.info("Inited ! {} {}", new Object[] { secretKey, mac });
+		logger.info("Inited ! {} {}", new Object[] { SECRET_KEY, mac });
 	}
 
-	private static class UserInfo
+	public AuthMgr()
 	{
-		public String role;
-
-		public String password;
-
-		public String fname; // properties file
-
-		public void set(String field, String fvalue)
-		{
-			switch (field)
-			{
-			case "role":
-				role = fvalue;
-				break;
-			case "password":
-				password = fvalue;
-				break;
-			default:
-				break;
-			}
-		}
+		super(false);
 	}
 
-	public static Map<String, Object> checkCredential(final Mac mac, final Map<String, Object> msg)
+	public static Map<String, Object> checkCredential(final Map<String, Object> msg)
 	{
 		String userId = (String) msg.get("userId");
 		String password = (String) msg.get("password");
@@ -129,7 +98,7 @@ public class AuthMgr extends SimpleChannelInboundHandler<Request>
 		if (password != null)
 		{
 			long sessStart = System.currentTimeMillis() / 1000L;
-			sessId = getSessId(mac, userId, sessStart);
+			sessId = getSessId(userId, sessStart);
 			Map<String, Object> reply = new HashMap<String, Object>();
 			reply.put("userId", userId);
 			reply.put("sessStart", sessStart);
@@ -141,7 +110,7 @@ public class AuthMgr extends SimpleChannelInboundHandler<Request>
 
 		sessId = (String) msg.get("sessId");
 		long sessStart = (long) msg.get("sessStart");
-		String nsessId = getSessId(mac, userId, sessStart);
+		String nsessId = getSessId(userId, sessStart);
 		if (sessId.equals(nsessId))
 			msg.put("status", "ok");
 		else
@@ -149,7 +118,7 @@ public class AuthMgr extends SimpleChannelInboundHandler<Request>
 		return msg;
 	}
 
-	public static String getSessId(final Mac mac, String userId, long sessStart)
+	public static String getSessId(String userId, long sessStart)
 	{
 		String cval = String.format("%s&%d", userId, sessStart);
 		return new String(Base64.encodeBase64(mac.doFinal(cval.getBytes())));
@@ -159,13 +128,20 @@ public class AuthMgr extends SimpleChannelInboundHandler<Request>
 	protected void channelRead0(final ChannelHandlerContext ctx, final Request request) throws Exception
 	{
 		FullHttpRequest httpReq = request.getHttpRequest();
+		if (reqValid(request))
+		{
+			ctx.writeAndFlush(request);
+			return;
+		}
 		String path = request.getRequestPath();
 		HttpMethod accessMethod = httpReq.getMethod();
 
 		String cookiestr = httpReq.headers().get(HttpHeaders.Names.COOKIE);
-		Set<Cookie> cookies = nocookies;
+		Set<Cookie> cookies;
 		if (cookiestr != null)
 			cookies = CookieDecoder.decode(cookiestr);
+		else
+			cookies = nocookies;
 
 		logger.info("Intercepted msg : headers {} {} {}!!!", path, cookies);
 
@@ -193,7 +169,6 @@ public class AuthMgr extends SimpleChannelInboundHandler<Request>
 		if (path.matches("/login") && accessMethod == HttpMethod.POST)
 		{
 			String body = httpReq.content().toString(CharsetUtil.UTF_8);
-
 			logger.info("Login request: {}", path);
 			Map<String, String> credentials = Utils.om.readValue(body, new TypeReference<Map<String, String>>()
 			{
@@ -207,9 +182,8 @@ public class AuthMgr extends SimpleChannelInboundHandler<Request>
 			}
 
 			sessStart = System.currentTimeMillis() / 1000L;
-			sessId = getSessId(mac, userId, sessStart);
+			sessId = getSessId(userId, sessStart);
 
-			FullHttpResponse resp = request.setResponse(HttpResponseStatus.OK, Unpooled.buffer(0));
 			for (Cookie reqcookie : cookies)
 			{
 				reqcookie.setMaxAge(0);
@@ -220,7 +194,7 @@ public class AuthMgr extends SimpleChannelInboundHandler<Request>
 			sessIdc.setPath("/");
 			cookies.remove(sessIdc);
 
-			sessIdc.setMaxAge(sessStart + validityWindow);
+			sessIdc.setMaxAge(sessStart + Config.getInstance().getValidityWindow());
 			cookies.add(sessIdc);
 
 			sessStartc = new DefaultCookie("sessStart", Long.toString(sessStart));
@@ -228,7 +202,7 @@ public class AuthMgr extends SimpleChannelInboundHandler<Request>
 			sessStartc.setPath("/");
 			cookies.remove(sessStartc);
 
-			sessIdc.setMaxAge(sessStart + validityWindow);
+			sessIdc.setMaxAge(sessStart + Config.getInstance().getValidityWindow());
 			cookies.add(sessStartc);
 
 			userIdc = new DefaultCookie("userId", userId);
@@ -236,19 +210,20 @@ public class AuthMgr extends SimpleChannelInboundHandler<Request>
 			userIdc.setPath("/");
 			cookies.remove(userIdc);
 
-			userIdc.setMaxAge(sessStart + validityWindow);
+			userIdc.setMaxAge(sessStart + Config.getInstance().getValidityWindow());
 			cookies.add(userIdc);
 
-			resp.headers().set(HttpHeaders.Names.SET_COOKIE, ClientCookieEncoder.encode(cookies));
+			FullHttpResponse resp = new DefaultFullHttpResponse(request.getHttpRequest().getProtocolVersion(), HttpResponseStatus.OK);
+			resp.headers().set(HttpHeaders.Names.SET_COOKIE, ServerCookieEncoder.encode(cookies));
 			ctx.writeAndFlush(new FullEncodedResponse(request, resp));
 			return;
 		}
 
-		if (sessIdc == null && userIdc == null && sessStartc == null)
-		{ // invalid request, opensession first
+		if (sessIdc == null || userIdc == null || sessStartc == null)
+		{
+			// invalid request, opensession first
 			logger.error("Invalid request, session doesnt exist!");
-			FullHttpResponse resp = request.setResponse(HttpResponseStatus.UNAUTHORIZED, ctx.alloc().buffer().writeBytes("Authorization absent, kindly sign-in first".getBytes()));
-			ctx.writeAndFlush(new FullEncodedResponse(request, resp));
+			sendResponse(ctx, request, HttpResponseStatus.UNAUTHORIZED, NOT_AUTHORIZED);
 			return;
 		}
 
@@ -259,35 +234,45 @@ public class AuthMgr extends SimpleChannelInboundHandler<Request>
 		if (sessStart < 0)
 			sessStart = Long.valueOf(sessStartc.getValue());
 
-		String csessid = getSessId(mac, userId, sessStart);
+		String csessid = getSessId(userId, sessStart);
 
 		if (!csessid.equals(sessId))
 		{
 			logger.error("Invalid credentials {} {}!!", sessId, csessid);
-			FullHttpResponse resp = request.setResponse(HttpResponseStatus.UNAUTHORIZED, ctx.alloc().buffer().writeBytes("Unauthorized access: kindly sign-in again".getBytes()));
-			ctx.writeAndFlush(new FullEncodedResponse(request, resp));
+			sendResponse(ctx, request, HttpResponseStatus.UNAUTHORIZED, UNAUTH_ACCESS);
 			return;
 		}
 
 		long elapseSecs = System.currentTimeMillis() / 1000L - sessStart;
-		if (invalidSessions.contains(sessId) || elapseSecs > validityWindow)
+		if (invalidSessions.contains(sessId) || elapseSecs > Config.getInstance().getValidityWindow())
 		{
-			FullHttpResponse resp = request.setResponse(HttpResponseStatus.UNAUTHORIZED,
-					ctx.alloc().buffer().writeBytes(String.format("Session Expired : %d", elapseSecs).getBytes()));
-			ctx.writeAndFlush(new FullEncodedResponse(request, resp));
+			sendResponse(ctx, request, HttpResponseStatus.UNAUTHORIZED, String.format(SESSION_EXPIRED, elapseSecs));
 			return;
 		}
 
 		if (path.matches("/logout") && accessMethod == HttpMethod.DELETE)
 		{
 			invalidSessions.add(sessId);
-			FullHttpResponse resp = request.setResponse(HttpResponseStatus.OK, ctx.alloc().buffer().writeBytes("Session Deleted Successfully".getBytes()));
-			ctx.writeAndFlush(new FullEncodedResponse(request, resp));
+			sendResponse(ctx, request, HttpResponseStatus.OK, SESSION_DELETED);
 			return;
 		}
 
 		httpReq.headers().set("userId", userId);
 		httpReq.headers().set("sessStart", Long.toString(sessStart));
 		ctx.fireChannelRead(request);
+	}
+
+	private boolean reqValid(Request request)
+	{
+		String token = request.getHttpRequest().headers().get("auth-token");
+		if (PUBLISHER_KEY.equals(token))
+			return true;
+		return false;
+	}
+
+	private void sendResponse(ChannelHandlerContext ctx, Request req, HttpResponseStatus status, String msg)
+	{
+		FullHttpResponse resp = new DefaultFullHttpResponse(req.getHttpRequest().getProtocolVersion(), status, ctx.alloc().buffer().writeBytes(msg.getBytes()));
+		ctx.writeAndFlush(new FullEncodedResponse(req, resp));
 	}
 }
