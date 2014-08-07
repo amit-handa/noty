@@ -1,12 +1,17 @@
 package com.ahanda.techops.noty.http.message;
 
+import io.netty.buffer.ByteBuf;
+import io.netty.handler.codec.http.DefaultFullHttpResponse;
 import io.netty.handler.codec.http.FullHttpRequest;
+import io.netty.handler.codec.http.FullHttpResponse;
+import io.netty.handler.codec.http.HttpResponseStatus;
 import io.netty.handler.codec.http.QueryStringDecoder;
 
 public class Request
 {
 
 	private final FullHttpRequest httpRequest;
+	private FullHttpResponse httpResponse;
 
 	private final long orderNumber;
 	
@@ -33,5 +38,18 @@ public class Request
 	public String getRequestPath()
 	{
 		return reqPath;
+	}
+
+	public FullHttpResponse getResponse() {
+		return httpResponse;
+	}
+
+	public FullHttpResponse setResponse( HttpResponseStatus status, ByteBuf buf )
+	{
+		if( httpResponse != null )
+			return null;
+
+        httpResponse = new DefaultFullHttpResponse( httpRequest.getProtocolVersion(), status, buf );
+        return httpResponse;
 	}
 }
