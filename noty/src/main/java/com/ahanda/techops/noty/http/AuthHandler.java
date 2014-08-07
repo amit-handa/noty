@@ -140,7 +140,7 @@ public class AuthHandler extends SimpleChannelInboundHandler<Request>
 		FullHttpRequest httpReq = request.getHttpRequest();
 		if (reqValid(request))
 		{
-			ctx.writeAndFlush(request);
+			ctx.fireChannelRead(request);
 			return;
 		}
 		String path = request.getRequestPath();
