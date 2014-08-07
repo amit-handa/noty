@@ -9,30 +9,29 @@ import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.util.Set;
 
+import javax.crypto.Mac;
+
 import com.fasterxml.jackson.databind.node.ObjectNode;
 
 public class Config
 {
 	private ObjectNode config;
+
 	private static ObjectNode defconfig;
-	
-	static {
+
+	static
+	{
 		defconfig = Utils.om.createObjectNode();
 
-        defconfig.put("macAlgoName", "HmacSHA256" );
-        defconfig.put( "sessKey", "NQtV5zDQjVqg9vofDSEmX7WA+wXhBhjaxengpeyFh7AANWoMEPe+qebTViYb7db6fAEJJK+tWP8KEh4J10PAFQ==" );
+		defconfig.put("macAlgoName", "HmacSHA256");
+		defconfig.put("sessKey", "NQtV5zDQjVqg9vofDSEmX7WA+wXhBhjaxengpeyFh7AANWoMEPe+qebTViYb7db6fAEJJK+tWP8KEh4J10PAFQ==");
 
-        defconfig.put("http", Utils.om.createObjectNode()
-            .put("host", "localhost")
-            .put("port", 8080 )
-            .put("sessValidityWindow", 3600 )
-            .put("maxRequestSize", 1048576 ) );
-         defconfig.put( "mongodb", Utils.om.createObjectNode()
-             .put( "host", "localhost" )
-             .put( "port", 27017 ) );
+		defconfig.put("http", Utils.om.createObjectNode().put("host", "localhost").put("port", 8080).put("sessValidityWindow", 3600).put("maxRequestSize", 1048576));
+		defconfig.put("mongodb", Utils.om.createObjectNode().put("host", "localhost").put("port", 27017));
 	}
 
-	public static ObjectNode getDefault() {
+	public static ObjectNode getDefault()
+	{
 		return defconfig;
 	}
 
@@ -62,11 +61,16 @@ public class Config
 		File f = new File(configFile.getFile());
 		byte[] encoded = Files.readAllBytes(Paths.get(f.getAbsolutePath()));
 		String jsonStr = new String(encoded, Charset.defaultCharset());
-		config = Utils.om.readValue(jsonStr, ObjectNode.class );
+		config = Utils.om.readValue(jsonStr, ObjectNode.class);
 	}
 
-	public ObjectNode get() {
+	public ObjectNode get()
+	{
 		return config;
 	}
 
+	public int getValidityWindow()
+	{
+		return config.get("http").get(NotyConstants.HTTP_SESSIONS_VALIDITY).asInt();
+	}
 }
