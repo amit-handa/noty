@@ -73,4 +73,14 @@ public class Config
 	{
 		return config.get("http").get(NotyConstants.HTTP_SESSIONS_VALIDITY).asInt();
 	}
+
+	public String getSecretKey()
+	{
+		return config.get("sessKey").asText();
+	}
+
+	public String getMacAlgoName()
+	{
+		return config.get("macAlgoName").asText();
+	}
 }

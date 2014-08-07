@@ -52,10 +52,6 @@ public class AuthMgr extends SimpleChannelInboundHandler<Request>
 
 	private static String NOT_AUTHORIZED = "Authorization absent, kindly sign-in first";
 
-	private static String MAC_ALGO_NAME = "HmacSHA256";
-
-	private static String SECRET_KEY = "NQtV5zDQjVqg9vofDSEmX7WA+wXhBhjaxengpeyFh7AANWoMEPe+qebTViYb7db6fAEJJK+tWP8KEh4J10PAFQ==";
-
 	private static String PUBLISHER_KEY = "Fh7AANW";
 
 	private static Mac mac;
@@ -69,16 +65,17 @@ public class AuthMgr extends SimpleChannelInboundHandler<Request>
 	{
 		try
 		{
+			String MAC_ALGO_NAME = Config.getInstance().getMacAlgoName();
+			String SECRET_KEY = Config.getInstance().getSecretKey();
 			mac = Mac.getInstance(MAC_ALGO_NAME);
 			SecretKeySpec sks = new SecretKeySpec(SECRET_KEY.getBytes(), MAC_ALGO_NAME);
 			mac.init(sks);
+			logger.info("Inited ! {} {}", new Object[] { SECRET_KEY, mac });
 		}
 		catch (Exception exc)
 		{
 			logger.warn("Exception found: {} {}", exc.getMessage(), exc.getStackTrace());
 		}
-
-		logger.info("Inited ! {} {}", new Object[] { SECRET_KEY, mac });
 	}
 
 	public AuthMgr()
