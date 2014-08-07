@@ -39,10 +39,10 @@ import com.fasterxml.jackson.core.type.TypeReference;
  * request. If the validation fails, server will create the cookie while user login
  *
  */
-public class AuthMgr extends SimpleChannelInboundHandler<Request>
+public class AuthHandler extends SimpleChannelInboundHandler<Request>
 {
 	// process all the uconfs and populate user-data
-	private static final Logger logger = LoggerFactory.getLogger(AuthMgr.class);
+	private static final Logger logger = LoggerFactory.getLogger(AuthHandler.class);
 
 	private static String UNAUTH_ACCESS = "Unauthorized access: kindly sign-in again";
 
@@ -78,7 +78,7 @@ public class AuthMgr extends SimpleChannelInboundHandler<Request>
 		}
 	}
 
-	public AuthMgr()
+	public AuthHandler()
 	{
 		super(false);
 	}
