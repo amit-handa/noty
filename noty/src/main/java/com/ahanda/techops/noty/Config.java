@@ -26,7 +26,7 @@ public class Config
             .put("host", "localhost")
             .put("port", 8080 )
             .put("sessValidityWindow", 3600 )
-            .put("maxRequestSize", 1048576 ) );
+            .put("maxRequestSize", 10485760 ) );
          defconfig.put( "mongodb", Utils.om.createObjectNode()
              .put( "host", "localhost" )
              .put( "port", 27017 ) );

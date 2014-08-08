@@ -21,6 +21,7 @@ import io.netty.handler.codec.http.FullHttpResponse;
 import io.netty.handler.codec.http.HttpHeaders;
 import io.netty.handler.codec.http.HttpMethod;
 import io.netty.handler.codec.http.HttpResponseStatus;
+import io.netty.handler.codec.http.ServerCookieEncoder;
 import io.netty.util.CharsetUtil;
 
 import javax.crypto.*; //Mac
@@ -219,7 +220,7 @@ public class AuthMgr extends SimpleChannelInboundHandler<Request>
             sessStartc.setPath("/");
             cookies.remove( sessStartc );
 
-            sessIdc.setMaxAge( sessStart + validityWindow );
+            sessStartc.setMaxAge( sessStart + validityWindow );
             cookies.add( sessStartc );
 
             userIdc = new DefaultCookie( "userId", userId );
@@ -230,7 +231,7 @@ public class AuthMgr extends SimpleChannelInboundHandler<Request>
             userIdc.setMaxAge( sessStart + validityWindow );
             cookies.add( userIdc );
 
-            resp.headers().set( HttpHeaders.Names.SET_COOKIE, ClientCookieEncoder.encode( cookies ) );
+            resp.headers().set( HttpHeaders.Names.SET_COOKIE, ServerCookieEncoder.encode( cookies ) );
         }
         
         if (sessIdc == null && userIdc == null && sessStartc == null ) { // invalid request, opensession first

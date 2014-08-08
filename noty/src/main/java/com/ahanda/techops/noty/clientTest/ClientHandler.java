@@ -91,7 +91,7 @@ public class ClientHandler extends SimpleChannelInboundHandler<HttpObject>
 
         request.headers().set(HttpHeaders.Names.CONTENT_LENGTH, request.content().readableBytes());
 
-        l.info("readable bytes {}", request.content().readableBytes());
+        l.info("login request {}", request );
 
         // Send the HTTP request.
         ch.writeAndFlush(request);
@@ -132,7 +132,7 @@ public class ClientHandler extends SimpleChannelInboundHandler<HttpObject>
         // Set some example cookies.
         request.headers().set(HttpHeaders.Names.COOKIE, ClientCookieEncoder.encode( sessCookies ) );
 
-        l.info("readable bytes {}", request.content().readableBytes());
+        l.info("PUB Event request {}", request );
 
         // Send the HTTP request.
         ch.writeAndFlush(request);
