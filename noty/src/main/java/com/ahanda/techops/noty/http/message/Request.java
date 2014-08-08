@@ -11,7 +11,6 @@ public class Request
 {
 
 	private final FullHttpRequest httpRequest;
-	private FullHttpResponse httpResponse;
 
 	private final long orderNumber;
 	
@@ -38,18 +37,5 @@ public class Request
 	public String getRequestPath()
 	{
 		return reqPath;
-	}
-
-	public FullHttpResponse getResponse() {
-		return httpResponse;
-	}
-
-	public FullHttpResponse setResponse( HttpResponseStatus status, ByteBuf buf )
-	{
-		if( httpResponse != null )
-			return null;
-
-        httpResponse = new DefaultFullHttpResponse( httpRequest.getProtocolVersion(), status, buf );
-        return httpResponse;
 	}
 }

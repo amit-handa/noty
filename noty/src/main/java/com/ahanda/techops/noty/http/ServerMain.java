@@ -1,5 +1,8 @@
 package com.ahanda.techops.noty.http;
 
+import static com.ahanda.techops.noty.NotyConstants.HOST;
+import static com.ahanda.techops.noty.NotyConstants.HTTP_MAX_REQUEST_SIZE;
+import static com.ahanda.techops.noty.NotyConstants.PORT;
 import io.netty.bootstrap.ServerBootstrap;
 import io.netty.channel.ChannelFuture;
 import io.netty.channel.ChannelInitializer;
@@ -16,14 +19,10 @@ import io.netty.util.concurrent.DefaultEventExecutorGroup;
 
 import java.io.IOException;
 
-import org.json.JSONObject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.ahanda.techops.noty.Config;
-
-import static com.ahanda.techops.noty.NotyConstants.*;
-
 import com.ahanda.techops.noty.db.MongoDBManager;
 import com.ahanda.techops.noty.http.exception.DefaultExceptionHandler;
 import com.fasterxml.jackson.databind.JsonNode;
@@ -58,6 +57,8 @@ public class ServerMain
 	{
 		try
 		{
+			Config cf = Config.getInstance();
+			cf.setupConfig();
 			config = Config.getInstance().get();
 		}
 		catch (IOException e)
@@ -105,8 +106,8 @@ public class ServerMain
 							chp.addLast("aggregator", new HttpObjectAggregator(maxRequestSize));
 							chp.addLast("pintRequestDecoder", new RequestDecoder());
 							chp.addLast("httpPayloadEncoder", new ResponseEncoder());
-							chp.addLast("authMgr", new AuthMgr() );
-							chp.addLast("httpPayloadDecoder", new ServerHandler(group));
+							chp.addLast("authHandler", new AuthHandler() );
+							chp.addLast("serverHandler", new ServerHandler(group));
 							chp.addLast("httpExceptionHandler", new DefaultExceptionHandler());
 						}
 					}).option(ChannelOption.SO_BACKLOG, 128) // (5)
@@ -132,7 +133,7 @@ public class ServerMain
 			workerGroup.shutdownGracefully();
 		}
 	}
-
+	
 	public static void main(String[] args) throws Exception
 	{
 		new ServerMain().run();

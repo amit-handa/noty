@@ -1,6 +1,7 @@
 {
 	"macAlgoName" : "HmacSHA256",
 	"sessKey" : "NQtV5zDQjVqg9vofDSEmX7WA+wXhBhjaxengpeyFh7AANWoMEPe+qebTViYb7db6fAEJJK+tWP8KEh4J10PAFQ==",
+	"auth-token" : "Fh7AANW",
 
 	"http":{	
 		"host" : "localhost",
@@ -9,7 +10,7 @@
 		"sessValidityWindow" : 3600
 	},
 	"mongodb": {
-		"host" : "192.168.1.18",
+		"host" : "localhost",
 		"port" : 27017,
         "pint" : {	
                 "events" : {
