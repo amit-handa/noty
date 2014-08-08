@@ -45,10 +45,6 @@ public class ServerHandler extends SimpleChannelInboundHandler<Request>
 {
 	private final EventExecutorGroup executor;
 
-	String clientId;
-
-	String username;
-
 	static final Logger l = LoggerFactory.getLogger(ServerHandler.class);
 
 	public ServerHandler(EventExecutorGroup e)

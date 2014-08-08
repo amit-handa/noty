@@ -1,9 +1,10 @@
 {
 	"macAlgoName" : "HmacSHA256",
 	"sessKey" : "NQtV5zDQjVqg9vofDSEmX7WA+wXhBhjaxengpeyFh7AANWoMEPe+qebTViYb7db6fAEJJK+tWP8KEh4J10PAFQ==",
+	"auth-token" : "Fh7AANW",
 
 	"http":{	
-		"host" : "localhost",
+		"host" : "192.168.1.35",
 		"port" : 8080,
 		"maxRequestSize" : 10485760,	
 		"sessValidityWindow" : 3600

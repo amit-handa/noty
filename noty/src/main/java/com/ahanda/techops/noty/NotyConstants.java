@@ -7,8 +7,7 @@ public class NotyConstants
 	public static final String REQUEST_TYPE = "request_type";
 
 	public static final String PUBLISH_EVENT = "publish_event";
-
-    public static final String MAC_ALGO_NAME = "macAlgoName";
+    
     public static final String SESS_KEY = "sessKey";
 
     public static final String HOST = "host";

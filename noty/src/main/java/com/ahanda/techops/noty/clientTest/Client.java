@@ -1,17 +1,14 @@
 /*
  * Copyright 2012 The Netty Project
- *
- * The Netty Project licenses this file to you under the Apache License,
- * version 2.0 (the "License"); you may not use this file except in compliance
- * with the License. You may obtain a copy of the License at:
- *
- *   http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
- * WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
- * License for the specific language governing permissions and limitations
- * under the License.
+ * 
+ * The Netty Project licenses this file to you under the Apache License, version 2.0 (the "License"); you may not use
+ * this file except in compliance with the License. You may obtain a copy of the License at:
+ * 
+ * http://www.apache.org/licenses/LICENSE-2.0
+ * 
+ * Unless required by applicable law or agreed to in writing, software distributed under the License is distributed on
+ * an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the License for the
+ * specific language governing permissions and limitations under the License.
  */
 package com.ahanda.techops.noty.clientTest;
 
@@ -50,26 +47,20 @@ public final class Client
 
 	public static void main(String[] args) throws Exception
 	{
-		JsonNode config = null; 
-		try
-		{
-			config = Config.getInstance().get().get("http");
-		}
-		catch (IOException e)
-		{
-			l.error("Exception while reading config file, server cannot be started", e);
-			return;
-		}
+		JsonNode config = null;
+		Config.getInstance().setupConfig();
+		config = Config.getInstance().get().get("http");
+
 		String scheme = "http";
 		String host = config.get( NotyConstants.HOST ).asText();
 		int port = config.get( NotyConstants.PORT ).asInt();
 
 		if (port == -1)
 		{
-            port = 8080;
+			port = 8080;
 		}
 
-		if (!"http".equalsIgnoreCase(scheme) )
+		if (!"http".equalsIgnoreCase(scheme))
 		{
 			l.warn("Only HTTP is supported.");
 			return;
@@ -115,8 +106,8 @@ public final class Client
 			// Make the connection attempt.
 			Channel ch = b.connect(host, port).sync().channel();
 
-			ClientHandler.login( ch, ClientHandler.credential );
-			//ClientHandler.pubEvent( ch, ClientHandler.event );
+			ClientHandler.login(ch, ClientHandler.credential);
+			// ClientHandler.pubEvent( ch, ClientHandler.event );
 
 			// Wait for the server to close the connection.
 			ch.closeFuture().sync();
