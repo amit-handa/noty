@@ -253,7 +253,9 @@ public class ServerHandler extends SimpleChannelInboundHandler<Request>
 				else
 				{
 					FullHttpResponse resp = request.getResponse();
-                    String msg = sources.get("values").toString();
+					Map< String, Object > config = new HashMap< String, Object >();
+					config.put( "esources", sources.get("values") );
+                    String msg = Utils.om.writeValueAsString( config );
 
 					DefaultFullHttpResponse nresp = new DefaultFullHttpResponse( resp.getProtocolVersion(), HttpResponseStatus.OK, ctx.alloc().buffer().writeBytes( msg.getBytes() ));
 					nresp.headers().add( resp.headers() );
