@@ -1,20 +1,27 @@
 package com.ahanda.techops.noty;
 
 import java.io.File;
+import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.IOException;
+import java.io.InputStream;
 import java.net.URL;
 import java.nio.charset.Charset;
 import java.nio.file.Files;
 import java.nio.file.Paths;
+import java.util.Properties;
 import java.util.Set;
 
 import javax.crypto.Mac;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import com.fasterxml.jackson.databind.node.ObjectNode;
 
 public class Config
 {
+	private static final Logger l = LoggerFactory.getLogger( Config.class );
 	private ObjectNode config;
 
 	private static ObjectNode defconfig;
@@ -54,7 +61,23 @@ public class Config
 
 	public void setupConfig() throws IOException
 	{
-		URL configFile = Thread.currentThread().getClass().getResource("/config.json");
+		String conff = System.getProperty("PINT.conf");
+		Properties prop = new Properties();
+		InputStream confStream = null;
+		try {
+            confStream = new FileInputStream( conff );
+            prop.load( confStream );
+		} catch( Exception e ) {
+			l.error( "error in loading properties {} {}", e.getMessage(), e.getStackTrace() );
+		} finally {
+			if( confStream != null )
+				confStream.close();
+		}
+
+		String jsonConf = prop.getProperty( "config" );
+		l.debug( "The config file path is {}", jsonConf );
+
+		URL configFile = Paths.get( jsonConf ).toUri().toURL();
 		if (configFile == null)
 		{
 			throw new FileNotFoundException("Config file not found");

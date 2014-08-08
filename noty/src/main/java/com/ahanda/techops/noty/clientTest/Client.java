@@ -47,6 +47,13 @@ public final class Client
 
 	public static void main(String[] args) throws Exception
 	{
+        if( args.length == 1 ) {
+			System.setProperty( "PINT.conf", args[0] );
+        }
+			
+        if( System.getProperty("PINT.conf") == null )
+        	throw new IllegalArgumentException();
+        
 		JsonNode config = null;
 		Config.getInstance().setupConfig();
 		config = Config.getInstance().get().get("http");
