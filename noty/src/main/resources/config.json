@@ -5,7 +5,7 @@
 	"http":{	
 		"host" : "localhost",
 		"port" : 8080,
-		"maxRequestSize" : 1048576,	
+		"maxRequestSize" : 10485760,	
 		"sessValidityWindow" : 3600
 	},
 	"mongodb": {

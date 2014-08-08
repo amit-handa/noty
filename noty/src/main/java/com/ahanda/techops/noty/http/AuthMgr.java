@@ -51,7 +51,6 @@ public class AuthMgr extends SimpleChannelInboundHandler<Request>
 	private Map<String, UserInfo> userInfos = new HashMap<String, UserInfo>();
 
 	private Set<String> invalidSessions = new HashSet<String>();
-	private static Set< Cookie > nocookies = new HashSet< Cookie >();
 
 	public AuthMgr()
 	{
@@ -154,15 +153,19 @@ public class AuthMgr extends SimpleChannelInboundHandler<Request>
 	protected void channelRead0(final ChannelHandlerContext ctx, final Request request ) throws Exception
 	{
 		FullHttpRequest httpReq = request.getHttpRequest();
+		logger.info("Received Request : {}!!!", httpReq );
+
 		String path = request.getRequestPath();
 		HttpMethod accessMethod = httpReq.getMethod();
 
-        String cookiestr = httpReq.headers().get( HttpHeaders.Names.COOKIE );
-        Set< Cookie > cookies = nocookies;
-        if( cookiestr != null )
-            cookies = CookieDecoder.decode( cookiestr );
-		
-		logger.info("Intercepted msg : headers {} {} {}!!!", path, cookies);
+        if( accessMethod != HttpMethod.POST && !path.equals("/logout" )) {
+			logger.error("Invalid request, Method not supported!");
+            FullHttpResponse resp = request.setResponse(HttpResponseStatus.UNAUTHORIZED, ctx.alloc().buffer().writeBytes("Authorization absent, kindly sign-in first".getBytes() ) );
+            ctx.writeAndFlush(new FullEncodedResponse( request, resp ));
+			return;
+        }
+
+        Set< Cookie > cookies = request.cookies();
 
 		Cookie sessIdc = null, userIdc = null, sessStartc = null;
 		for( Cookie c : cookies ) {
@@ -183,10 +186,10 @@ public class AuthMgr extends SimpleChannelInboundHandler<Request>
 
 		String sessId = null, userId = null;
 		long sessStart = -1;
-        if (path.matches("/login") && accessMethod == HttpMethod.POST ) {
+        if (path.matches("/login" ) ) { 
             String body = httpReq.content().toString( CharsetUtil.UTF_8 );
 
-			logger.info("Login request: {}", path);
+			logger.info("Login request: {} {}", path, body);
 			Map< String, String > credentials = Utils.om.readValue( body, new TypeReference< Map< String, String > >() {} );
             userId = credentials.get("userId");
 
@@ -228,8 +231,6 @@ public class AuthMgr extends SimpleChannelInboundHandler<Request>
             cookies.add( userIdc );
 
             resp.headers().set( HttpHeaders.Names.SET_COOKIE, ClientCookieEncoder.encode( cookies ) );
-            ctx.writeAndFlush( new FullEncodedResponse( request, resp ));
-            return;
         }
         
         if (sessIdc == null && userIdc == null && sessStartc == null ) { // invalid request, opensession first

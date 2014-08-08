@@ -60,31 +60,7 @@ public class ServerHandler extends SimpleChannelInboundHandler<Request>
 	@Override
 	protected void channelRead0(final ChannelHandlerContext ctx, final Request request) throws Exception
 	{
-		l.debug("Received request for {}", request.getHttpRequest());
-
-		HttpResponseStatus status = validateReq(ctx, request);
-		if (status != HttpResponseStatus.ACCEPTED)
-		{
-			sendResponse(ctx, request, status);
-			return;
-		}
-
 		handleReq(ctx, request);
-	}
-
-	/*
-	 * This functions checks if proper cookie or auth key is available in the headers or not. If not present request will not be granted. This will also check for the method too
-	 */
-	private HttpResponseStatus validateReq(final ChannelHandlerContext ctx, final Request request)
-	{
-		FullHttpRequest httpRequest = request.getHttpRequest();
-		if (httpRequest.getMethod() != POST)
-			return HttpResponseStatus.METHOD_NOT_ALLOWED;
-
-		/**
-		 * TODO : Check for headers here to finalize the request
-		 */
-		return HttpResponseStatus.ACCEPTED;
 	}
 
 	private void handleReq(final ChannelHandlerContext ctx, final Request request) throws Exception
@@ -241,6 +217,55 @@ public class ServerHandler extends SimpleChannelInboundHandler<Request>
 	private void handleLogin(final List<String> paths, final ChannelHandlerContext ctx, final Request request)
 	{
 		assert paths.isEmpty();
+
+		FullHttpResponse resp = request.getResponse();
+		assert resp != null;
+		
+        Future<Map<String, Object>> future = executor.submit(new Callable<Map<String, Object>>()
+		{
+			@Override
+			public Map<String, Object> call() throws Exception
+			{
+				Map< String, Object > cmd = new LinkedHashMap< String, Object >();
+				cmd.put( "distinct", "events");
+				cmd.put( "key", "source");
+
+				Map<String, Object> op = new LinkedHashMap<String, Object>();
+				op.put("action", "command");
+				op.put("db", "pint");
+				op.put("command", cmd );
+				return MongoDBManager.getInstance().execOp(op);
+			}
+		});
+		future.addListener(new GenericFutureListener<Future<Map<String, Object>>>()
+		{
+			@Override
+			public void operationComplete(Future<Map<String, Object>> future) throws Exception
+			{
+				if (!future.isSuccess())
+				{
+					ctx.fireExceptionCaught(new NotyException(request, HttpResponseStatus.INTERNAL_SERVER_ERROR, future.cause()));
+					return;
+				}
+
+				Map<String, Object> sources = future.get();
+
+				if (sources == null )
+				{
+					sendResponse(ctx, request, HttpResponseStatus.INTERNAL_SERVER_ERROR );
+				}
+				else
+				{
+					FullHttpResponse resp = request.getResponse();
+                    String msg = sources.get("values").toString();
+
+					DefaultFullHttpResponse nresp = new DefaultFullHttpResponse( resp.getProtocolVersion(), HttpResponseStatus.OK, ctx.alloc().buffer().writeBytes( msg.getBytes() ));
+					nresp.headers().add( resp.headers() );
+
+					ctx.writeAndFlush( new FullEncodedResponse( request, nresp ) );
+				}
+			}
+		});	
 	}
 
 	private void handleEvents(final List<String> paths, final ChannelHandlerContext ctx, final Request request) throws NotyException
@@ -381,14 +406,14 @@ public class ServerHandler extends SimpleChannelInboundHandler<Request>
 
 	private void sendResponse(ChannelHandlerContext ctx, Request request, HttpResponseStatus status)
 	{
-		FullHttpResponse httpResponse = new DefaultFullHttpResponse(HTTP_1_1, status);
+		FullHttpResponse httpResponse = new DefaultFullHttpResponse(request.getHttpRequest().getProtocolVersion(), status);
 		FullEncodedResponse encodedResponse = new FullEncodedResponse(request, httpResponse);
 		ctx.writeAndFlush(encodedResponse);
 	}
 
 	private void sendJsonResponse(ChannelHandlerContext ctx, Request request, HttpResponseStatus status, String content)
 	{
-		FullHttpResponse httpResponse = new DefaultFullHttpResponse(HTTP_1_1, OK, Unpooled.copiedBuffer(content, CharsetUtil.UTF_8));
+		FullHttpResponse httpResponse = new DefaultFullHttpResponse(request.getHttpRequest().getProtocolVersion(), OK, Unpooled.copiedBuffer(content, CharsetUtil.UTF_8));
 		httpResponse.headers().set(CONTENT_TYPE, "application/json");
 		FullEncodedResponse encodedResponse = new FullEncodedResponse(request, httpResponse);
 		ctx.writeAndFlush(encodedResponse);

@@ -19,6 +19,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import static com.ahanda.techops.noty.NotyConstants.*;
 
 import com.mongodb.BasicDBObject;
+import com.mongodb.CommandResult;
 import com.mongodb.DB;
 import com.mongodb.DBCollection;
 import com.mongodb.DBCursor;
@@ -72,7 +73,6 @@ public class MongoDBManager
 		ensureIndex();
 	}
 
-	@SuppressWarnings("unchecked")
 	private void ensureIndex() throws Exception
 	{
 		JsonNode dbconf = config.get(MONGODB.PINT_DB);
@@ -101,25 +101,36 @@ public class MongoDBManager
 
 	public Map< String, Object > execOp(Map< String, Object > op)
 	{
-		DB pintDB = dbconn.getDB((String)op.get("db"));
-		DBCollection dbcoll = pintDB.getCollection( (String)op.get("collection"));
+		DB db = dbconn.getDB((String)op.get("db"));
 		String action = (String)op.get("action");
-		
+		DBCollection dbcoll = null;
 		switch ( action )
 		{
 		case "save":
+            dbcoll = db.getCollection( (String)op.get("collection"));
 			List< Object > events = Utils.doCast( op.get("document") );
 			return doSave(dbcoll, events );
 		case "find":
+            dbcoll = db.getCollection( (String)op.get("collection"));
 			return doFind(dbcoll, op);
 		case "update":
+            dbcoll = db.getCollection( (String)op.get("collection"));
 			return doUpdate(dbcoll, op);
+		case "command":
+			return doCommand( db, op );
 		default:
 			l.error("Unsupported DB operation {}", action );
 			break;
 		}
 		
 		return null;
+	}
+
+	private Map<String, Object> doCommand(DB db, Map<String, Object> op)
+	{
+        Map< String, Object > cmd = Utils.doCast(op.get("command"));
+		CommandResult cr = db.command( new BasicDBObject( cmd ) );
+		return Utils.doCast(cr.toMap());
 	}
 
 	private Map< String, Object > doUpdate(DBCollection dbcoll, Map< String, Object > op)
