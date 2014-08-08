@@ -133,9 +133,16 @@ public class ServerMain
 			workerGroup.shutdownGracefully();
 		}
 	}
-	
+
 	public static void main(String[] args) throws Exception
 	{
+        if( args.length == 1 ) {
+			System.setProperty( "PINT.conf", args[0] );
+        }
+			
+        if( System.getProperty("PINT.conf") == null )
+        	throw new IllegalArgumentException();
+
 		new ServerMain().run();
 	}
 }

@@ -1,5 +1,6 @@
 package com.ahanda.techops.noty.http;
 
+import io.netty.buffer.Unpooled;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.SimpleChannelInboundHandler;
 import io.netty.handler.codec.http.Cookie;
@@ -28,10 +29,13 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.ahanda.techops.noty.Config;
+import com.ahanda.techops.noty.NotyConstants;
 import com.ahanda.techops.noty.Utils;
 import com.ahanda.techops.noty.http.message.FullEncodedResponse;
 import com.ahanda.techops.noty.http.message.Request;
 import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 
 /**
  * 
@@ -53,6 +57,8 @@ public class AuthHandler extends SimpleChannelInboundHandler<Request>
 
 	private static String NOT_AUTHORIZED = "Authorization absent, kindly sign-in first";
 
+	private static long validityWindow;
+
 	private Mac mac;
 
 	private static SecretKeySpec sks;
@@ -67,6 +73,14 @@ public class AuthHandler extends SimpleChannelInboundHandler<Request>
 			String macAlgoName = Config.getInstance().getMacAlgoName();
 			String secretKey = Config.getInstance().getSecretKey();
 			sks = new SecretKeySpec(secretKey.getBytes(), macAlgoName);
+
+			ObjectNode config = Config.getInstance().get();
+			ObjectNode defconfig = Config.getDefault();
+			validityWindow = defconfig.get("http").get( NotyConstants.HTTP_SESSIONS_VALIDITY ).asLong();
+			JsonNode tmp = config.get( "http" ).get( NotyConstants.HTTP_SESSIONS_VALIDITY );
+			if( tmp != null )
+				validityWindow = tmp.asLong();
+
 		}
 		catch (IllegalArgumentException exc)
 		{
@@ -146,108 +160,96 @@ public class AuthHandler extends SimpleChannelInboundHandler<Request>
 		String path = request.getRequestPath();
 		HttpMethod accessMethod = httpReq.getMethod();
 
-		Cookie sessIdc = null, userIdc = null, sessStartc = null;
-		String cookiestr = httpReq.headers().get(HttpHeaders.Names.COOKIE);
-		Set<Cookie> cookies = null;
+        if( accessMethod != HttpMethod.POST && !path.equals("/logout" )) {
+			logger.error("Invalid request, Method not supported!");
+            FullHttpResponse resp = request.setResponse(HttpResponseStatus.UNAUTHORIZED, ctx.alloc().buffer().writeBytes("Authorization absent, kindly sign-in first".getBytes() ) );
+            ctx.writeAndFlush(new FullEncodedResponse( request, resp ));
+			return;
+        }
 
-		if (cookiestr != null)
-		{
-			cookies = CookieDecoder.decode(cookiestr);
-			logger.info("Intercepted msg : headers {} {} {}!!!", path, cookies);
-			
-			for (Cookie c : cookies)
-			{
-				switch (c.getName())
-				{
-				case "sessId":
-					sessIdc = c;
-					break;
-				case "userId":
-					userIdc = c;
-					break;
-				case "sessStart":
-					sessStartc = c;
-					break;
-				default:
-					break;
-				}
+        Set< Cookie > cookies = request.cookies();
+
+		Cookie sessIdc = null, userIdc = null, sessStartc = null;
+		for( Cookie c : cookies ) {
+			switch( c.getName()) {
+			case "sessId" :
+				sessIdc = c;
+				break;
+			case "userId" :
+				userIdc = c;
+				break;
+			case "sessStart" :
+				sessStartc = c;
+				break;
+            default:
+                break;
 			}
 		}
 
 		String sessId = null, userId = null;
 		long sessStart = -1;
-		if (path.matches("/login") && accessMethod == HttpMethod.POST)
-		{
-			if(cookies == null)
-				cookies = new HashSet<Cookie>();
-			
-			String body = httpReq.content().toString(CharsetUtil.UTF_8);
-			logger.info("Login request: {}", path);
-			Map<String, String> credentials = Utils.om.readValue(body, new TypeReference<Map<String, String>>()
-			{
-			});
-			userId = credentials.get("userId");
+        if (path.matches("/login" ) ) { 
+            String body = httpReq.content().toString( CharsetUtil.UTF_8 );
 
-			if (userId == null)
-			{ // authenticate userId
-				logger.debug("Cannot validate User {}, Fix it, continuing as usual !");
-				// return null;
-			}
+			logger.info("Login request: {} {}", path, body);
+			Map< String, String > credentials = Utils.om.readValue( body, new TypeReference< Map< String, String > >() {} );
+            userId = credentials.get("userId");
 
-			sessStart = System.currentTimeMillis() / 1000L;
-			sessId = getSessId(userId, sessStart);
+            if (userId == null) { // authenticate userId
+                logger.debug("Cannot validate User {}, Fix it, continuing as usual !" );
+                // return null;
+            }
+    
+            sessStart = System.currentTimeMillis() / 1000L;
+            sessId = getSessId( userId, sessStart );
 
-			for (Cookie reqcookie : cookies)
-			{
-				reqcookie.setMaxAge(0);
-			}
+            FullHttpResponse resp = request.setResponse( HttpResponseStatus.OK, Unpooled.buffer(0) );
+            for( Cookie reqcookie : cookies ) {
+            	reqcookie.setMaxAge( 0 );
+            }
 
-			sessIdc = new DefaultCookie("sessId", sessId);
-			sessIdc.setHttpOnly(true);
-			sessIdc.setPath("/");
-			cookies.remove(sessIdc);
+            sessIdc = new DefaultCookie( "sessId", sessId );
+            sessIdc.setHttpOnly( true );
+            sessIdc.setPath("/");
+            cookies.remove( sessIdc );
 
-			sessIdc.setMaxAge(sessStart + Config.getInstance().getValidityWindow());
-			cookies.add(sessIdc);
+            sessIdc.setMaxAge( sessStart + validityWindow );
+            cookies.add( sessIdc );
 
-			sessStartc = new DefaultCookie("sessStart", Long.toString(sessStart));
-			sessStartc.setHttpOnly(true);
-			sessStartc.setPath("/");
-			cookies.remove(sessStartc);
+            sessStartc = new DefaultCookie( "sessStart", Long.toString(sessStart) );
+            sessStartc.setHttpOnly( true );
+            sessStartc.setPath("/");
+            cookies.remove( sessStartc );
 
-			sessIdc.setMaxAge(sessStart + Config.getInstance().getValidityWindow());
-			cookies.add(sessStartc);
+            sessStartc.setMaxAge( sessStart + validityWindow );
+            cookies.add( sessStartc );
 
-			userIdc = new DefaultCookie("userId", userId);
-			userIdc.setHttpOnly(true);
-			userIdc.setPath("/");
-			cookies.remove(userIdc);
+            userIdc = new DefaultCookie( "userId", userId );
+            userIdc.setHttpOnly( true );
+            userIdc.setPath("/");
+            cookies.remove( userIdc );
 
-			userIdc.setMaxAge(sessStart + Config.getInstance().getValidityWindow());
-			cookies.add(userIdc);
+            userIdc.setMaxAge( sessStart + validityWindow );
+            cookies.add( userIdc );
 
-			FullHttpResponse resp = new DefaultFullHttpResponse(request.getHttpRequest().getProtocolVersion(), HttpResponseStatus.OK);
-			resp.headers().set(HttpHeaders.Names.SET_COOKIE, ServerCookieEncoder.encode(cookies));
-			ctx.writeAndFlush(new FullEncodedResponse(request, resp));
-			return;
-		}
-
-		if (sessIdc == null || userIdc == null || sessStartc == null)
-		{
-			// invalid request, opensession first
+            resp.headers().set( HttpHeaders.Names.SET_COOKIE, ServerCookieEncoder.encode( cookies ) );
+        }
+        
+        if (sessIdc == null && userIdc == null && sessStartc == null ) { // invalid request, opensession first
 			logger.error("Invalid request, session doesnt exist!");
-			sendResponse(ctx, request, HttpResponseStatus.UNAUTHORIZED, NOT_AUTHORIZED);
+            FullHttpResponse resp = request.setResponse(HttpResponseStatus.UNAUTHORIZED, ctx.alloc().buffer().writeBytes("Authorization absent, kindly sign-in first".getBytes() ) );
+            ctx.writeAndFlush(new FullEncodedResponse( request, resp ));
 			return;
 		}
 
-		if (sessId == null)
-			sessId = sessIdc.getValue();
-		if (userId == null)
-			userId = userIdc.getValue();
-		if (sessStart < 0)
-			sessStart = Long.valueOf(sessStartc.getValue());
-
-		String csessid = getSessId(userId, sessStart);
+        if( sessId == null )
+            sessId = sessIdc.getValue();
+		if( userId == null )
+            userId = userIdc.getValue();
+		if( sessStart < 0 )
+            sessStart = Long.valueOf( sessStartc.getValue() );
+		
+		String csessid = getSessId( userId, sessStart );
 
 		if (!csessid.equals(sessId))
 		{

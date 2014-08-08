@@ -16,6 +16,7 @@
 package com.ahanda.techops.noty.clientTest;
 
 import java.io.StringWriter;
+import java.util.HashSet;
 import java.util.Set;
 
 import org.json.JSONArray;
@@ -54,7 +55,7 @@ public class ClientHandler extends SimpleChannelInboundHandler<HttpObject>
 	int state = 0;	// 0 -> pub event, 1 -> getevent
 
 	static JSONObject getEvents = new JSONObject().put( "source", "PROD.Topaz" );
-	Set< Cookie > sessCookies = null;
+	Set< Cookie > sessCookies = new HashSet< Cookie >();
 
 	private void getEvents(Channel ch, FullHttpResponse resp ) {
         StringWriter estr = new StringWriter();
@@ -91,7 +92,7 @@ public class ClientHandler extends SimpleChannelInboundHandler<HttpObject>
 
         request.headers().set(HttpHeaders.Names.CONTENT_LENGTH, request.content().readableBytes());
 
-        l.info("readable bytes {}", request.content().readableBytes());
+        l.info("login request {}", request );
 
         // Send the HTTP request.
         ch.writeAndFlush(request);
@@ -132,7 +133,7 @@ public class ClientHandler extends SimpleChannelInboundHandler<HttpObject>
         // Set some example cookies.
         request.headers().set(HttpHeaders.Names.COOKIE, ClientCookieEncoder.encode( sessCookies ) );
 
-        l.info("readable bytes {}", request.content().readableBytes());
+        l.info("PUB Event request {}", request );
 
         // Send the HTTP request.
         ch.writeAndFlush(request);
@@ -191,7 +192,10 @@ public class ClientHandler extends SimpleChannelInboundHandler<HttpObject>
 		switch( state ) {
 		case 1:
 			FullHttpResponse resp = (FullHttpResponse)msg;
-            sessCookies = CookieDecoder.decode(resp.headers().get( HttpHeaders.Names.SET_COOKIE ) );
+            for( String cookiestr : resp.headers().getAll( HttpHeaders.Names.SET_COOKIE ) ) {
+                Set< Cookie > tmp = CookieDecoder.decode( cookiestr );
+                sessCookies.addAll( tmp );
+            }
 			pubEvent( ctx.channel(), event, (FullHttpResponse)msg );
 			break;
 		case 2:
