@@ -105,7 +105,7 @@ public final class Client
 					// p.addLast(new HttpContentDecompressor());
 
 					// Uncomment the following line if you don't want to handle HttpContents.
-					p.addLast(new HttpObjectAggregator(1048576));
+					p.addLast(new HttpObjectAggregator(10485760));
 
 					p.addLast(new ClientHandler());
 				}

@@ -333,12 +333,13 @@ public class ServerHandler extends SimpleChannelInboundHandler<Request>
 
 	private void pubEvents(final ChannelHandlerContext ctx, final Request request) throws NotyException
 	{
-		l.debug("received request for publishing message !!!!");
 		FullHttpRequest httpRequest = request.getHttpRequest();
+		l.debug("received request for publishing message !!!! " );
 		final List<Object> eventList;
 		try
 		{
 			String jsonString = httpRequest.content().toString(CharsetUtil.UTF_8);
+			l.debug( "eventlist body {}", jsonString );
 			eventList = Utils.om.readValue(jsonString, new TypeReference<ArrayList<Object>>()
 			{
 			});
