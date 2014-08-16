@@ -1,8 +1,5 @@
 package com.ahanda.techops.noty.http;
 
-import static com.ahanda.techops.noty.NotyConstants.HOST;
-import static com.ahanda.techops.noty.NotyConstants.HTTP_MAX_REQUEST_SIZE;
-import static com.ahanda.techops.noty.NotyConstants.PORT;
 import io.netty.bootstrap.ServerBootstrap;
 import io.netty.channel.ChannelFuture;
 import io.netty.channel.ChannelInitializer;
@@ -25,18 +22,12 @@ import org.slf4j.LoggerFactory;
 import com.ahanda.techops.noty.Config;
 import com.ahanda.techops.noty.db.MongoDBManager;
 import com.ahanda.techops.noty.http.exception.DefaultExceptionHandler;
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.node.ObjectNode;
 
 /**
  * Discards any incoming data.
  */
 public class ServerMain
 {
-	private ObjectNode config;
-
-	private ObjectNode defconfig = Config.getDefault();
-
 	private String host;
 
 	private int port;
@@ -55,11 +46,11 @@ public class ServerMain
 
 	public void run() throws Exception
 	{
+		Config cf;
 		try
 		{
-			Config cf = Config.getInstance();
+			cf = Config.getInstance();
 			cf.setupConfig();
-			config = Config.getInstance().get();
 		}
 		catch (IOException e)
 		{
@@ -67,24 +58,9 @@ public class ServerMain
 			return;
 		}
 
-		final JsonNode httpconfig = config.get("http");
-		JsonNode defhttpconfig = config.get("http");
-
-		host = defhttpconfig.get(HOST).asText();
-		port = defhttpconfig.get(PORT).asInt();
-		int mreqsize = defhttpconfig.get(HTTP_MAX_REQUEST_SIZE).asInt();
-		if (httpconfig != null)
-		{
-			JsonNode tmp = httpconfig.get(HOST);
-			host = tmp != null ? tmp.asText() : host;
-
-			tmp = httpconfig.get(PORT);
-			port = tmp != null ? tmp.asInt() : port;
-
-			tmp = httpconfig.get(HTTP_MAX_REQUEST_SIZE);
-			mreqsize = tmp != null ? tmp.asInt() : port;
-		}
-		final int maxRequestSize = mreqsize;
+		host =  cf.getHttpHost();
+		port = cf.getHttpPort();
+		final int maxRequestSize = cf.getHttpMaxRequestSize();
 
 		l.info("creating server on {} {}", host, port);
 		final DefaultEventExecutorGroup group = new DefaultEventExecutorGroup(100);
