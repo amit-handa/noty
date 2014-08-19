@@ -166,7 +166,8 @@ public class MongoDBManager
 		for( int i = 0; i < op.size(); i++ ) {
 			Map<String, Object > m = Utils.doCast( op.get(i) );
             DBObject dbObject = new BasicDBObject( m );
-            WriteResult wr = dbcoll.insert( dbObject );
+            // upserts if the doc exists already.
+            WriteResult wr = dbcoll.save( dbObject, null );
             n += wr.getN();
 		}
         l.info("row : {} inserted. Rows affected : {}", dbcoll, n);
@@ -228,22 +229,5 @@ public class MongoDBManager
 			String s = obj != null ? obj.toString() : null;
 			l.info(s);
 		}
-	}
-
-	public void save(JsonNode eventList)
-	{
-		int count = eventList.size();
-		DB pintDB = dbconn.getDB(MONGODB.PINT_DB);
-		DBCollection events = pintDB.getCollection(MONGODB.EVENTS_COLL);
-		events.createIndex(new BasicDBObject(MONGODB.ESOURCE_COL, 1).append(MONGODB.ETIME_COL, 2));
-		
-		List<DBObject> list = new ArrayList<>(count);
-		for (int i = 0; i < count; i++)
-		{
-			DBObject dbObject = (DBObject) JSON.parse(eventList.get(i).toString());
-			list.add(dbObject);
-		}
-		WriteResult wr = events.insert(list);
-		l.info("Bulk insert rows affected : " + wr.getN());
 	}
 }

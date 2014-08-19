@@ -185,7 +185,6 @@ public class ClientHandler extends SimpleChannelInboundHandler<HttpObject>
 			if (content instanceof LastHttpContent)
 			{
 				System.out.println("} END OF CONTENT");
-				//ctx.close();
 			}
 		}
 		
@@ -205,6 +204,7 @@ public class ClientHandler extends SimpleChannelInboundHandler<HttpObject>
 			logout( ctx.channel() );
 			break;
 		default:
+            ctx.close();
 			break;
 		}
 	}
