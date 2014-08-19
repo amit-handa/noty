@@ -347,7 +347,7 @@ public class ServerHandler extends SimpleChannelInboundHandler<Request>
 				else
 				{
 					resp = HttpResponseStatus.OK;
-					msg = event.get("results").toString();
+					msg = Utils.om.writeValueAsString( event.get( "results"));
 					sendJsonResponse(ctx, request, resp, msg);
 				}
 			}
