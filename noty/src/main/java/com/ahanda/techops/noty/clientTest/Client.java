@@ -47,12 +47,9 @@ public final class Client
 
 	public static void main(String[] args) throws Exception
 	{
-		JsonNode config = null;
-		config = Config.getInstance().get().get("http");
-
 		String scheme = "http";
-		String host = config.get("host").asText();
-		int port = config.get("port").asInt();
+		String host = Config.getInstance().getHttpHost();
+		int port = Config.getInstance().getHttpPort();
 
 		if (port == -1)
 		{

@@ -16,12 +16,18 @@ import java.util.Set;
 
 import javax.crypto.Mac;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import com.ahanda.techops.noty.http.AuthHandler;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 
 public class Config
 {
+	private static final Logger logger = LoggerFactory.getLogger(Config.class);
+	
 	private ObjectNode config;
 
 	private ObjectNode defconfig;
@@ -88,6 +94,7 @@ public class Config
 		String jsonStr = new String(encoded, Charset.defaultCharset());
 		config = Utils.om.readValue(jsonStr, ObjectNode.class);
 		createConfigMap(config);
+		printConfig();
 	}
 
 	private void createConfigMap(ObjectNode node)
@@ -161,11 +168,6 @@ public class Config
 		}
 	}
 
-	public ObjectNode get()
-	{
-		return config;
-	}
-
 	public String getMongoHost()
 	{
 		return (String) configMap.get(NotyConstants.MONGO_DB + "." + NotyConstants.HOST).getValue();
@@ -215,5 +217,14 @@ public class Config
 	public String getAuthToken()
 	{
 		return (String) configMap.get(NotyConstants.AUTH_TOKEN).getValue();
+	}
+	
+	private void printConfig()
+	{
+		for(Entry<String, Pair> e : configMap.entrySet())
+		{
+			logger.debug(e.getKey() + ":" + e.getValue().getValue());		
+		}
+		
 	}
 }
