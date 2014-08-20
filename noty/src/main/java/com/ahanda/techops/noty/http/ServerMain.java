@@ -33,10 +33,9 @@ import com.fasterxml.jackson.databind.node.ObjectNode;
  */
 public class ServerMain
 {
-	private ObjectNode config;
 
-	private ObjectNode defconfig = Config.getDefault();
-
+	private Config cf;
+	
 	private String host;
 
 	private int port;
@@ -57,9 +56,8 @@ public class ServerMain
 	{
 		try
 		{
-			Config cf = Config.getInstance();
+			cf = Config.getInstance();
 			cf.setupConfig();
-			config = Config.getInstance().get();
 		}
 		catch (IOException e)
 		{
@@ -67,24 +65,10 @@ public class ServerMain
 			return;
 		}
 
-		final JsonNode httpconfig = config.get("http");
-		JsonNode defhttpconfig = config.get("http");
+		host = cf.getHttpHost();
+		port = cf.getHttpPort();
 
-		host = defhttpconfig.get(HOST).asText();
-		port = defhttpconfig.get(PORT).asInt();
-		int mreqsize = defhttpconfig.get(HTTP_MAX_REQUEST_SIZE).asInt();
-		if (httpconfig != null)
-		{
-			JsonNode tmp = httpconfig.get(HOST);
-			host = tmp != null ? tmp.asText() : host;
-
-			tmp = httpconfig.get(PORT);
-			port = tmp != null ? tmp.asInt() : port;
-
-			tmp = httpconfig.get(HTTP_MAX_REQUEST_SIZE);
-			mreqsize = tmp != null ? tmp.asInt() : port;
-		}
-		final int maxRequestSize = mreqsize;
+		final int maxRequestSize = cf.getHttpMaxRequestSize();
 
 		l.info("creating server on {} {}", host, port);
 		final DefaultEventExecutorGroup group = new DefaultEventExecutorGroup(100);

@@ -1,23 +1,23 @@
 package com.ahanda.techops.noty.db;
 
+import static com.ahanda.techops.noty.NotyConstants.HOST;
+import static com.ahanda.techops.noty.NotyConstants.PORT;
+
 import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
+import java.util.Map.Entry;
 
 import org.json.JSONException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.ahanda.techops.noty.Config;
+import com.ahanda.techops.noty.NotyConstants.MONGODB;
 import com.ahanda.techops.noty.Utils;
 import com.fasterxml.jackson.databind.JsonNode;
-
-import static com.ahanda.techops.noty.NotyConstants.*;
-
 import com.mongodb.BasicDBObject;
 import com.mongodb.CommandResult;
 import com.mongodb.DB;
@@ -36,8 +36,7 @@ public class MongoDBManager
 
 	private static MongoDBManager instance;
 
-	JsonNode config = Config.getInstance().get().get("mongodb");
-	JsonNode defconfig = Config.getDefault().get("mongodb");
+	Map<String, Object> mongoConfig;
 
 	/*
 	 * This is for unit testing
@@ -60,128 +59,123 @@ public class MongoDBManager
 
 	private MongoDBManager() throws JSONException, Exception
 	{
-		String host = defconfig.get(HOST).asText();
-		JsonNode tmp = config.get(HOST);
-		host = tmp != null ? tmp.asText() : host;
+		mongoConfig = Config.getInstance().getMongoDBConfig();
+		String host = (String) mongoConfig.get(HOST);
+		int port = (int)mongoConfig.get(PORT);
 
-        int port = defconfig.get(PORT).asInt();
-		tmp = config.get(PORT );
-		port = tmp != null ? tmp.asInt() : port;
-
-		dbconn = new MongoClient( host, port );
+		dbconn = new MongoClient(host, port);
 		l.info("Events DB non-null : {}", dbconn);
 		ensureIndex();
 	}
 
 	private void ensureIndex() throws Exception
 	{
-		JsonNode dbconf = config.get(MONGODB.PINT_DB);
-        DB db = dbconn.getDB(MONGODB.PINT_DB);
-        Iterator< Map.Entry< String, JsonNode > > collI = dbconf.fields();
-        while( collI.hasNext() )
-        {
-        	Map.Entry< String, JsonNode > coll = collI.next();
-            DBCollection dbcoll = db.getCollection(coll.getKey());
-            JsonNode collconf = coll.getValue();
-            JsonNode indexes = collconf.get("indexes");
+		Map<String,Object> dbconf = (Map<String,Object>)mongoConfig.get(MONGODB.PINT_DB);
+		DB db = dbconn.getDB(MONGODB.PINT_DB);
+		for (Entry<String, Object> e : dbconf.entrySet())
+		{
+			DBCollection dbcoll = db.getCollection(e.getKey());
+			Map<String,Object> collConf = (Map<String, Object>) e.getValue();
+			List<String> indexes = (List<String>) collConf.get("indexes");
 
-            // index for that collection could be null
-            if (indexes != null)
-            {
-                BasicDBObject dbindex = new BasicDBObject();
-                for (int i = 0; i < indexes.size(); i++)
-                {
-                    String idx = indexes.get(i).asText();
-                    dbindex.append(idx, i + 1);
-                }
-                dbcoll.createIndex(dbindex);
-            }
-        }
+			// index for that collection could be null
+			if (indexes != null)
+			{
+				BasicDBObject dbindex = new BasicDBObject();
+				for (int i = 0; i < indexes.size(); i++)
+				{
+					String idx = indexes.get(i);
+					dbindex.append(idx, i + 1);
+				}
+				dbcoll.createIndex(dbindex);
+			}
+		}
 	}
 
-	public Map< String, Object > execOp(Map< String, Object > op)
+	public Map<String, Object> execOp(Map<String, Object> op)
 	{
-		DB db = dbconn.getDB((String)op.get("db"));
-		String action = (String)op.get("action");
+		DB db = dbconn.getDB((String) op.get("db"));
+		String action = (String) op.get("action");
 		DBCollection dbcoll = null;
-		switch ( action )
+		switch (action)
 		{
 		case "save":
-            dbcoll = db.getCollection( (String)op.get("collection"));
-			List< Object > events = Utils.doCast( op.get("document") );
-			return doSave(dbcoll, events );
+			dbcoll = db.getCollection((String) op.get("collection"));
+			List<Object> events = Utils.doCast(op.get("document"));
+			return doSave(dbcoll, events);
 		case "find":
-            dbcoll = db.getCollection( (String)op.get("collection"));
+			dbcoll = db.getCollection((String) op.get("collection"));
 			return doFind(dbcoll, op);
 		case "update":
-            dbcoll = db.getCollection( (String)op.get("collection"));
+			dbcoll = db.getCollection((String) op.get("collection"));
 			return doUpdate(dbcoll, op);
 		case "command":
-			return doCommand( db, op );
+			return doCommand(db, op);
 		default:
-			l.error("Unsupported DB operation {}", action );
+			l.error("Unsupported DB operation {}", action);
 			break;
 		}
-		
+
 		return null;
 	}
 
 	private Map<String, Object> doCommand(DB db, Map<String, Object> op)
 	{
-        Map< String, Object > cmd = Utils.doCast(op.get("command"));
-		CommandResult cr = db.command( new BasicDBObject( cmd ) );
+		Map<String, Object> cmd = Utils.doCast(op.get("command"));
+		CommandResult cr = db.command(new BasicDBObject(cmd));
 		return Utils.doCast(cr.toMap());
 	}
 
-	private Map< String, Object > doUpdate(DBCollection dbcoll, Map< String, Object > op)
+	private Map<String, Object> doUpdate(DBCollection dbcoll, Map<String, Object> op)
 	{
-		return new LinkedHashMap< String, Object >();
+		return new LinkedHashMap<String, Object>();
 	}
 
-	private Map< String, Object > doFind(DBCollection dbcoll, Map< String, Object > op)
+	private Map<String, Object> doFind(DBCollection dbcoll, Map<String, Object> op)
 	{
 		l.info("reached exec find!");
-		Map< String, Object > retval = new LinkedHashMap< String, Object >();
-        Map< String, Object > matcher = Utils.doCast(op.get( "matcher" ) );
-        DBObject dbquery = new BasicDBObject( matcher );
+		Map<String, Object> retval = new LinkedHashMap<String, Object>();
+		Map<String, Object> matcher = Utils.doCast(op.get("matcher"));
+		DBObject dbquery = new BasicDBObject(matcher);
 
-		DBCursor result = dbcoll.find( dbquery );
-		List< Object > results = new ArrayList< Object >();
-		for( DBObject o : result )
+		DBCursor result = dbcoll.find(dbquery);
+		List<Object> results = new ArrayList<Object>();
+		for (DBObject o : result)
 		{
 			o.removeField("_id");
-			results.add( o.toMap() );
+			results.add(o.toMap());
 		}
 
-		retval.put("results", results );
-		retval.put("status", "ok" );
+		retval.put("results", results);
+		retval.put("status", "ok");
 		return retval;
 	}
 
-	private Map< String, Object > doSave(DBCollection dbcoll, List< Object > op)
+	private Map<String, Object> doSave(DBCollection dbcoll, List<Object> op)
 	{
-		Map< String, Object > retval = new HashMap< String, Object >();
+		Map<String, Object> retval = new HashMap<String, Object>();
 
 		int n = 0;
-		for( int i = 0; i < op.size(); i++ ) {
-			Map<String, Object > m = Utils.doCast( op.get(i) );
-            DBObject dbObject = new BasicDBObject( m );
-            WriteResult wr = dbcoll.insert( dbObject );
-            n += wr.getN();
+		for (int i = 0; i < op.size(); i++)
+		{
+			Map<String, Object> m = Utils.doCast(op.get(i));
+			DBObject dbObject = new BasicDBObject(m);
+			WriteResult wr = dbcoll.insert(dbObject);
+			n += wr.getN();
 		}
-        l.info("row : {} inserted. Rows affected : {}", dbcoll, n);
+		l.info("row : {} inserted. Rows affected : {}", dbcoll, n);
 
-        retval.put("status", "ok" );
-        retval.put( "results", n );
+		retval.put("status", "ok");
+		retval.put("results", n);
 		return retval;
 	}
 
-	public String getEvent(Map< String, Object > query)
+	public String getEvent(Map<String, Object> query)
 	{
-		DB db = dbconn.getDB( (String)query.get("db") );
-		DBCollection coll = db.getCollection( (String)query.get("collection") );
-		Map< String, Object > matcher = Utils.doCast(query.get( "matcher" ) );
-		DBObject dbquery = new BasicDBObject( matcher );
+		DB db = dbconn.getDB((String) query.get("db"));
+		DBCollection coll = db.getCollection((String) query.get("collection"));
+		Map<String, Object> matcher = Utils.doCast(query.get("matcher"));
+		DBObject dbquery = new BasicDBObject(matcher);
 		DBObject result = coll.findOne(dbquery);
 		if (result == null)
 		{
@@ -203,9 +197,9 @@ public class MongoDBManager
 	private static void testGet() throws JSONException, Exception
 	{
 		MongoDBManager mgr = getInstance();
-        Map< String, Object > matcher = new LinkedHashMap< String, Object >();
-        matcher.put("esource", "TOPAZ.PROD");
-		String event = mgr.getEvent( matcher );
+		Map<String, Object> matcher = new LinkedHashMap<String, Object>();
+		matcher.put("esource", "TOPAZ.PROD");
+		String event = mgr.getEvent(matcher);
 		System.out.println(event);
 	}
 
@@ -214,7 +208,7 @@ public class MongoDBManager
 		MongoDBManager mgr = getInstance();
 		String j2 = "{'esource':'TOPAZ.PROD','etime':'2014-06-27 06:17:57.878','message':'Apache Camel 2.12.1 starting','id':'org.apache.camel.main.MainSupport','status':'START','etype':'initialization'}";
 		// JsonNode o1 = new JsonNode(j1);
-		Map< String, Object > o2 = new LinkedHashMap< String, Object >();
+		Map<String, Object> o2 = new LinkedHashMap<String, Object>();
 		o2.put("action", "save");
 		o2.put("db", MONGODB.PINT_DB);
 		o2.put("collection", MONGODB.EVENTS_COLL);
@@ -236,7 +230,7 @@ public class MongoDBManager
 		DB pintDB = dbconn.getDB(MONGODB.PINT_DB);
 		DBCollection events = pintDB.getCollection(MONGODB.EVENTS_COLL);
 		events.createIndex(new BasicDBObject(MONGODB.ESOURCE_COL, 1).append(MONGODB.ETIME_COL, 2));
-		
+
 		List<DBObject> list = new ArrayList<>(count);
 		for (int i = 0; i < count; i++)
 		{
