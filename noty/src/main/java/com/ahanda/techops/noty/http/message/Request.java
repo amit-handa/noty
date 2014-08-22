@@ -19,7 +19,6 @@ public class Request
 	private final FullHttpRequest httpRequest;
 	private FullHttpResponse httpResponse;
 	private Set< Cookie > cookies;
-	private static Set< Cookie > nocookies = new HashSet< Cookie >();
 
 	private final long orderNumber;
 	
@@ -53,7 +52,6 @@ public class Request
             String cookiestr = httpRequest.headers().get( HttpHeaders.Names.COOKIE );
             if( cookiestr != null )
                 cookies = CookieDecoder.decode( cookiestr );
-            else cookies = nocookies;
 		}
 		return cookies;
 	}
