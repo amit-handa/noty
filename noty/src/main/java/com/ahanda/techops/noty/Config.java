@@ -17,6 +17,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 
 public class Config
 {
@@ -65,6 +66,7 @@ public class Config
 		}
 
 		String jsonConf = prop.getProperty(CONFIG);
+
 		l.debug("The config file path is {}", jsonConf);
 
 		URL configFile = Paths.get(jsonConf).toUri().toURL();

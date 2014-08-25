@@ -156,12 +156,12 @@ public class MongoDBManager
 		Map<String, Object> retval = new HashMap<String, Object>();
 
 		int n = 0;
-		for (int i = 0; i < op.size(); i++)
-		{
-			Map<String, Object> m = Utils.doCast(op.get(i));
-			DBObject dbObject = new BasicDBObject(m);
-			WriteResult wr = dbcoll.insert(dbObject);
-			n += wr.getN();
+		for( int i = 0; i < op.size(); i++ ) {
+			Map<String, Object > m = Utils.doCast( op.get(i) );
+            DBObject dbObject = new BasicDBObject( m );
+            // upserts if the doc exists already.
+            WriteResult wr = dbcoll.save( dbObject, null );
+            n += wr.getN();
 		}
 		l.info("row : {} inserted. Rows affected : {}", dbcoll, n);
 
@@ -240,4 +240,5 @@ public class MongoDBManager
 		WriteResult wr = events.insert(list);
 		l.info("Bulk insert rows affected : " + wr.getN());
 	}
+
 }

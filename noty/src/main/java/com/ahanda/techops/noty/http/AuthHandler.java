@@ -16,6 +16,7 @@ import io.netty.util.CharsetUtil;
 
 import java.io.IOException;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
 
@@ -159,6 +160,8 @@ public class AuthHandler extends SimpleChannelInboundHandler<Request>
         }
 
         Set< Cookie > cookies = request.cookies();
+        if( cookies == null )
+        	cookies = new HashSet< Cookie >();
 
 		Cookie sessIdc = null, userIdc = null, sessStartc = null;
 		for( Cookie c : cookies ) {
@@ -177,9 +180,11 @@ public class AuthHandler extends SimpleChannelInboundHandler<Request>
 			}
 		}
 
-		String sessId = null, userId = null;
-		long sessStart = -1;
-        if (path.matches("/login" ) ) { 
+		String sessId = sessIdc != null ? sessIdc.getValue() : null;
+		String userId = userIdc != null ? userIdc.getValue() : null;
+		long sessStart = sessStartc != null ? Long.valueOf(sessStartc.getValue()) : -1;
+
+        if (path.matches("/login" ) && ( sessIdc == null || userId == null || sessStart == -1 ) ) {
             String body = httpReq.content().toString( CharsetUtil.UTF_8 );
 
 			logger.info("Login request: {} {}", path, body);
@@ -226,7 +231,7 @@ public class AuthHandler extends SimpleChannelInboundHandler<Request>
             resp.headers().set( HttpHeaders.Names.SET_COOKIE, ServerCookieEncoder.encode( cookies ) );
         }
         
-        if (sessIdc == null && userIdc == null && sessStartc == null ) { // invalid request, opensession first
+        if (sessIdc == null || userIdc == null || sessStartc == null ) { // invalid request, opensession first
 			logger.error("Invalid request, session doesnt exist!");
             FullHttpResponse resp = request.setResponse(HttpResponseStatus.UNAUTHORIZED, ctx.alloc().buffer().writeBytes("Authorization absent, kindly sign-in first".getBytes() ) );
             ctx.writeAndFlush(new FullEncodedResponse( request, resp ));
@@ -263,8 +268,6 @@ public class AuthHandler extends SimpleChannelInboundHandler<Request>
 			return;
 		}
 
-		httpReq.headers().set("userId", userId);
-		httpReq.headers().set("sessStart", Long.toString(sessStart));
 		ctx.fireChannelRead(request);
 	}
 
