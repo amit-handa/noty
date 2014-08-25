@@ -37,7 +37,8 @@ import com.ahanda.techops.noty.NotyConstants;
 import com.fasterxml.jackson.databind.JsonNode;
 
 /**
- * A simple HTTP client that prints out the content of the HTTP response to {@link System#out} to test {@link HttpSnoopServer}.
+ * A simple HTTP client that prints out the content of the HTTP response to {@link System#out} to test
+ * {@link HttpSnoopServer}.
  */
 public final class Client
 {
@@ -47,20 +48,21 @@ public final class Client
 
 	public static void main(String[] args) throws Exception
 	{
-        if( args.length == 1 ) {
-			System.setProperty( "PINT.conf", args[0] );
-        }
-			
-        if( System.getProperty("PINT.conf") == null )
-        	throw new IllegalArgumentException();
-        
+		if (args.length == 1)
+		{
+			System.setProperty("PINT.conf", args[0]);
+		}
+
+		if (System.getProperty("PINT.conf") == null)
+			throw new IllegalArgumentException();
+
 		JsonNode config = null;
-		Config.getInstance().setupConfig();
-		config = Config.getInstance().get().get("http");
+		Config cf = Config.getInstance();
+		cf.setupConfig();
 
 		String scheme = "http";
-		String host = config.get( NotyConstants.HOST ).asText();
-		int port = config.get( NotyConstants.PORT ).asInt();
+		String host = cf.getHttpHost();
+		int port = cf.getHttpPort();
 
 		if (port == -1)
 		{

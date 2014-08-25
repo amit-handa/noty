@@ -9,40 +9,25 @@ import java.net.URL;
 import java.nio.charset.Charset;
 import java.nio.file.Files;
 import java.nio.file.Paths;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.Properties;
-import java.util.Set;
-
-import javax.crypto.Mac;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 
 public class Config
 {
 	private static final Logger l = LoggerFactory.getLogger(Config.class);
 
-	private ObjectNode config;
+	private static final String CONFIG_FILE = "PINT.conf";
 
-	private static ObjectNode defconfig;
+	private static final String CONFIG = "config";
 
-	static
-	{
-		defconfig = Utils.om.createObjectNode();
-
-		defconfig.put("macAlgoName", "HmacSHA256");
-		defconfig.put("sessKey", "NQtV5zDQjVqg9vofDSEmX7WA+wXhBhjaxengpeyFh7AANWoMEPe+qebTViYb7db6fAEJJK+tWP8KEh4J10PAFQ==");
-		defconfig.put("auth-token", "Fh7AANW");
-
-		defconfig.put("http", Utils.om.createObjectNode().put("host", "localhost").put("port", 8080).put("sessValidityWindow", 3600).put("maxRequestSize", 1048576));
-		defconfig.put("mongodb", Utils.om.createObjectNode().put("host", "localhost").put("port", 27017));
-	}
-
-	public static ObjectNode getDefault()
-	{
-		return defconfig;
-	}
+	Map<String, Object> configMap;
 
 	private static Config _instance;
 
@@ -62,7 +47,7 @@ public class Config
 
 	public void setupConfig() throws IOException
 	{
-		String conff = System.getProperty("PINT.conf");
+		String conff = System.getProperty(CONFIG_FILE);
 		Properties prop = new Properties();
 		InputStream confStream = null;
 		try
@@ -80,7 +65,8 @@ public class Config
 				confStream.close();
 		}
 
-		String jsonConf = prop.getProperty("config");
+		String jsonConf = prop.getProperty(CONFIG);
+
 		l.debug("The config file path is {}", jsonConf);
 
 		URL configFile = Paths.get(jsonConf).toUri().toURL();
@@ -91,31 +77,57 @@ public class Config
 		File f = new File(configFile.getFile());
 		byte[] encoded = Files.readAllBytes(Paths.get(f.getAbsolutePath()));
 		String jsonStr = new String(encoded, Charset.defaultCharset());
-		config = Utils.om.readValue(jsonStr, ObjectNode.class);
+		configMap = Utils.om.readValue(jsonStr, new TypeReference<HashMap<String, Object>>()
+		{
+		});
 	}
 
-	public ObjectNode get()
+	public Map<String,Object> getMongoDBConfig()
 	{
-		return config;
+		return (Map<String, Object>) configMap.get(NotyConstants.MONGO_DB);
 	}
 
-	public int getValidityWindow()
+	@SuppressWarnings("unchecked")
+	public long getHttpValidityWindow()
 	{
-		return config.get("http").get(NotyConstants.HTTP_SESSIONS_VALIDITY).asInt();
+		return (long)((Map<String, Object>)configMap.get(NotyConstants.HTTP)).get( NotyConstants.HTTP_SESSIONS_VALIDITY );
+	}
+	
+	@SuppressWarnings("unchecked")
+	public String getHttpHost()
+	{
+		return (String)((Map<String, Object>)configMap.get(NotyConstants.HTTP)).get( NotyConstants.HOST);
+	}
+	
+	@SuppressWarnings("unchecked")
+	public int getHttpPort()
+	{
+		return (int)((Map<String, Object>)configMap.get(NotyConstants.HTTP)).get( NotyConstants.PORT);
+	}
+	
+	@SuppressWarnings("unchecked")
+	public int getHttpMaxRequestSize()
+	{
+		return (int)((Map<String, Object>)configMap.get(NotyConstants.HTTP)).get( NotyConstants.HTTP_MAX_REQUEST_SIZE);
+	}
+	
+	public Object getHttpConfig()
+	{
+		return configMap.get(NotyConstants.HTTP);
 	}
 
 	public String getSecretKey()
 	{
-		return config.get("sessKey").asText();
+		return (String) configMap.get(NotyConstants.SESS_KEY);
 	}
 
 	public String getMacAlgoName()
 	{
-		return config.get("macAlgoName").asText();
+		return (String) configMap.get(NotyConstants.MAC_ALGO_NAME);
 	}
 
 	public String getAuthToken()
 	{
-		return config.get("auth-token").asText();
+		return (String) configMap.get(NotyConstants.AUTH_TOKEN);
 	}
 }

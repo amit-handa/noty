@@ -4,7 +4,6 @@ import io.netty.buffer.Unpooled;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.SimpleChannelInboundHandler;
 import io.netty.handler.codec.http.Cookie;
-import io.netty.handler.codec.http.CookieDecoder;
 import io.netty.handler.codec.http.DefaultCookie;
 import io.netty.handler.codec.http.DefaultFullHttpResponse;
 import io.netty.handler.codec.http.FullHttpRequest;
@@ -34,8 +33,6 @@ import com.ahanda.techops.noty.Utils;
 import com.ahanda.techops.noty.http.message.FullEncodedResponse;
 import com.ahanda.techops.noty.http.message.Request;
 import com.fasterxml.jackson.core.type.TypeReference;
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.node.ObjectNode;
 
 /**
  * 
@@ -47,6 +44,7 @@ import com.fasterxml.jackson.databind.node.ObjectNode;
 public class AuthHandler extends SimpleChannelInboundHandler<Request>
 {
 	// process all the uconfs and populate user-data
+	
 	private static final Logger logger = LoggerFactory.getLogger(AuthHandler.class);
 
 	private static String UNAUTH_ACCESS = "Unauthorized access: kindly sign-in again";
@@ -63,6 +61,7 @@ public class AuthHandler extends SimpleChannelInboundHandler<Request>
 
 	private static SecretKeySpec sks;
 
+
 	/**
 	 * All the security stuff should be common for all the channels, and should be instantiated before processing
 	 */
@@ -73,14 +72,7 @@ public class AuthHandler extends SimpleChannelInboundHandler<Request>
 			String macAlgoName = Config.getInstance().getMacAlgoName();
 			String secretKey = Config.getInstance().getSecretKey();
 			sks = new SecretKeySpec(secretKey.getBytes(), macAlgoName);
-
-			ObjectNode config = Config.getInstance().get();
-			ObjectNode defconfig = Config.getDefault();
-			validityWindow = defconfig.get("http").get( NotyConstants.HTTP_SESSIONS_VALIDITY ).asLong();
-			JsonNode tmp = config.get( "http" ).get( NotyConstants.HTTP_SESSIONS_VALIDITY );
-			if( tmp != null )
-				validityWindow = tmp.asLong();
-
+			validityWindow = Config.getInstance().getHttpValidityWindow();
 		}
 		catch (IllegalArgumentException exc)
 		{
@@ -263,7 +255,7 @@ public class AuthHandler extends SimpleChannelInboundHandler<Request>
 		}
 
 		long elapseSecs = System.currentTimeMillis() / 1000L - sessStart;
-		if (elapseSecs > Config.getInstance().getValidityWindow())
+		if (elapseSecs > Config.getInstance().getHttpValidityWindow())
 		{
 			sendResponse(ctx, request, HttpResponseStatus.UNAUTHORIZED, String.format(SESSION_EXPIRED, elapseSecs));
 			return;
