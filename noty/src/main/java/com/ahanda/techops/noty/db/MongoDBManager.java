@@ -10,6 +10,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 
+import org.bson.types.ObjectId;
 import org.json.JSONException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -34,7 +35,11 @@ public class MongoDBManager
 
 	private MongoClient dbconn;
 
-	private static MongoDBManager instance;
+	private DB pintDb;
+
+	private DBCollection events;
+
+	private static volatile MongoDBManager instance;
 
 	Map<String, Object> mongoConfig;
 
@@ -61,21 +66,23 @@ public class MongoDBManager
 	{
 		mongoConfig = Config.getInstance().getMongoDBConfig();
 		String host = (String) mongoConfig.get(HOST);
-		int port = (int)mongoConfig.get(PORT);
+		int port = (int) mongoConfig.get(PORT);
 
 		dbconn = new MongoClient(host, port);
+		pintDb = dbconn.getDB(MONGODB.PINT_DB);
+		events = pintDb.getCollection(MONGODB.EVENTS_COLL);
 		l.info("Events DB non-null : {}", dbconn);
 		ensureIndex();
 	}
 
+	@SuppressWarnings("unchecked")
 	private void ensureIndex() throws Exception
 	{
-		Map<String,Object> dbconf = (Map<String,Object>)mongoConfig.get(MONGODB.PINT_DB);
-		DB db = dbconn.getDB(MONGODB.PINT_DB);
+		Map<String, Object> dbconf = (Map<String, Object>) mongoConfig.get(MONGODB.PINT_DB);
 		for (Entry<String, Object> e : dbconf.entrySet())
 		{
-			DBCollection dbcoll = db.getCollection(e.getKey());
-			Map<String,Object> collConf = (Map<String, Object>) e.getValue();
+			DBCollection dbcoll = pintDb.getCollection(e.getKey());
+			Map<String, Object> collConf = (Map<String, Object>) e.getValue();
 			List<String> indexes = (List<String>) collConf.get("indexes");
 
 			// index for that collection could be null
@@ -156,12 +163,13 @@ public class MongoDBManager
 		Map<String, Object> retval = new HashMap<String, Object>();
 
 		int n = 0;
-		for( int i = 0; i < op.size(); i++ ) {
-			Map<String, Object > m = Utils.doCast( op.get(i) );
-            DBObject dbObject = new BasicDBObject( m );
-            // upserts if the doc exists already.
-            WriteResult wr = dbcoll.save( dbObject, null );
-            n += wr.getN();
+		for (int i = 0; i < op.size(); i++)
+		{
+			Map<String, Object> m = Utils.doCast(op.get(i));
+			DBObject dbObject = new BasicDBObject(m);
+			// upserts if the doc exists already.
+			WriteResult wr = dbcoll.save(dbObject, null);
+			n += wr.getN();
 		}
 		l.info("row : {} inserted. Rows affected : {}", dbcoll, n);
 
@@ -241,4 +249,29 @@ public class MongoDBManager
 		l.info("Bulk insert rows affected : " + wr.getN());
 	}
 
+	/**
+	 * This function returns the paged entries from the MongoDB. Pass the minimum ObjectId and it will return all the
+	 * values greater than that. Results will be in the ascending order.
+	 * 
+	 * @param id
+	 * @param limit
+	 * @return
+	 */
+	@SuppressWarnings("rawtypes")
+	public List<Map> getPagedEvents(ObjectId id, int limit)
+	{
+		BasicDBObject dbquery = new BasicDBObject();
+		if (id != null)
+			dbquery.append("_id", new BasicDBObject().append("$lt", id));
+
+		DBCursor result = events.find(dbquery).limit(limit).sort(new BasicDBObject().append("_id", -1));
+		if (result == null)
+			return null;
+		List<Map> results = new ArrayList<Map>();
+		for (DBObject o : result)
+		{
+			results.add(o.toMap());
+		}
+		return results;
+	}
 }
