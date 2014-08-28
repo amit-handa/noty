@@ -61,6 +61,8 @@ public class AuthHandler extends SimpleChannelInboundHandler<Request>
 
 	private static SecretKeySpec sks;
 
+	private boolean isClientValid = false;
+
 	/**
 	 * All the security stuff should be common for all the channels, and should be instantiated before processing
 	 */
@@ -143,13 +145,16 @@ public class AuthHandler extends SimpleChannelInboundHandler<Request>
 	protected void channelRead0(final ChannelHandlerContext ctx, final Request request) throws Exception
 	{
 		FullHttpRequest httpReq = request.getHttpRequest();
-		if (reqValid(request))
-		{
-			ctx.fireChannelRead(request);
-			return;
-		}
 		String path = request.getRequestPath();
 		HttpMethod accessMethod = httpReq.getMethod();
+
+		if (path.matches("/logout") && accessMethod == HttpMethod.DELETE)
+		{
+			sendResponse(ctx, request, HttpResponseStatus.OK, SESSION_DELETED);
+			setClientAuthenticated(false);
+			ctx.close();
+			return;
+		}
 
 		if (accessMethod != HttpMethod.POST && !path.equals("/logout"))
 		{
@@ -159,121 +164,129 @@ public class AuthHandler extends SimpleChannelInboundHandler<Request>
 			return;
 		}
 
-		Set<Cookie> cookies = request.cookies();
-		if (cookies == null)
-			cookies = new HashSet<Cookie>();
-
-		Cookie sessIdc = null, userIdc = null, sessStartc = null;
-		for (Cookie c : cookies)
+		if (reqValid(request))
 		{
-			switch (c.getName())
-			{
-			case "sessId":
-				sessIdc = c;
-				break;
-			case "userId":
-				userIdc = c;
-				break;
-			case "sessStart":
-				sessStartc = c;
-				break;
-			default:
-				break;
-			}
+			ctx.fireChannelRead(request);
+			return;
 		}
 
-		String sessId = sessIdc != null ? sessIdc.getValue() : null;
-		String userId = userIdc != null ? userIdc.getValue() : null;
-		long sessStart = sessStartc != null ? Long.valueOf(sessStartc.getValue()) : -1;
-
-		if (path.matches("/login") && (sessIdc == null || userId == null || sessStart == -1))
+		/*
+		 * We need to check the client auth when a new connection is made as in old connection auth is already taken
+		 * care off.
+		 */
+		if (!isClientAuthenticated())
 		{
-			String body = httpReq.content().toString(CharsetUtil.UTF_8);
+			Set<Cookie> cookies = request.cookies();
+			if (cookies == null)
+				cookies = new HashSet<Cookie>();
 
-			logger.info("Login request: {} {}", path, body);
-			Map<String, String> credentials = Utils.om.readValue(body, new TypeReference<Map<String, String>>()
+			Cookie sessIdc = null, userIdc = null, sessStartc = null;
+			for (Cookie c : cookies)
 			{
-			});
-			userId = credentials.get("userId");
+				switch (c.getName())
+				{
+				case "sessId":
+					sessIdc = c;
+					break;
+				case "userId":
+					userIdc = c;
+					break;
+				case "sessStart":
+					sessStartc = c;
+					break;
+				default:
+					break;
+				}
+			}
 
+			String sessId = sessIdc != null ? sessIdc.getValue() : null;
+			String userId = userIdc != null ? userIdc.getValue() : null;
+			long sessStart = sessStartc != null ? Long.valueOf(sessStartc.getValue()) : -1;
+
+			if (path.matches("/login") && (sessIdc == null || userId == null || sessStart == -1))
+			{
+				String body = httpReq.content().toString(CharsetUtil.UTF_8);
+
+				logger.info("Login request: {} {}", path, body);
+				Map<String, String> credentials = Utils.om.readValue(body, new TypeReference<Map<String, String>>()
+				{
+				});
+				userId = credentials.get("userId");
+
+				if (userId == null)
+				{ // authenticate userId
+					logger.debug("Cannot validate User {}, Fix it, continuing as usual !");
+					// return null;
+				}
+
+				sessStart = System.currentTimeMillis() / 1000L;
+				sessId = getSessId(userId, sessStart);
+
+				FullHttpResponse resp = request.setResponse(HttpResponseStatus.OK, Unpooled.buffer(0));
+				for (Cookie reqcookie : cookies)
+				{
+					reqcookie.setMaxAge(0);
+				}
+
+				sessIdc = new DefaultCookie("sessId", sessId);
+				sessIdc.setHttpOnly(true);
+				sessIdc.setPath("/");
+				cookies.remove(sessIdc);
+
+				sessIdc.setMaxAge(sessStart + validityWindow);
+				cookies.add(sessIdc);
+
+				sessStartc = new DefaultCookie("sessStart", Long.toString(sessStart));
+				sessStartc.setHttpOnly(true);
+				sessStartc.setPath("/");
+				cookies.remove(sessStartc);
+
+				sessStartc.setMaxAge(sessStart + validityWindow);
+				cookies.add(sessStartc);
+
+				userIdc = new DefaultCookie("userId", userId);
+				userIdc.setHttpOnly(true);
+				userIdc.setPath("/");
+				cookies.remove(userIdc);
+
+				userIdc.setMaxAge(sessStart + validityWindow);
+				cookies.add(userIdc);
+
+				resp.headers().set(HttpHeaders.Names.SET_COOKIE, ServerCookieEncoder.encode(cookies));
+			}
+
+			if (sessIdc == null || userIdc == null || sessStartc == null)
+			{ // invalid request, opensession first
+				logger.error("Invalid request, session doesnt exist!");
+				FullHttpResponse resp = request.setResponse(HttpResponseStatus.UNAUTHORIZED,
+						ctx.alloc().buffer().writeBytes("Authorization absent, kindly sign-in first".getBytes()));
+				ctx.writeAndFlush(new FullEncodedResponse(request, resp));
+				return;
+			}
+
+			if (sessId == null)
+				sessId = sessIdc.getValue();
 			if (userId == null)
-			{ // authenticate userId
-				logger.debug("Cannot validate User {}, Fix it, continuing as usual !");
-				// return null;
-			}
+				userId = userIdc.getValue();
+			if (sessStart < 0)
+				sessStart = Long.valueOf(sessStartc.getValue());
 
-			sessStart = System.currentTimeMillis() / 1000L;
-			sessId = getSessId(userId, sessStart);
+			String csessid = getSessId(userId, sessStart);
 
-			FullHttpResponse resp = request.setResponse(HttpResponseStatus.OK, Unpooled.buffer(0));
-			for (Cookie reqcookie : cookies)
+			if (!csessid.equals(sessId))
 			{
-				reqcookie.setMaxAge(0);
+				logger.error("Invalid credentials {} {}!!", sessId, csessid);
+				sendResponse(ctx, request, HttpResponseStatus.UNAUTHORIZED, UNAUTH_ACCESS);
+				return;
 			}
 
-			sessIdc = new DefaultCookie("sessId", sessId);
-			sessIdc.setHttpOnly(true);
-			sessIdc.setPath("/");
-			cookies.remove(sessIdc);
-
-			sessIdc.setMaxAge(sessStart + validityWindow);
-			cookies.add(sessIdc);
-
-			sessStartc = new DefaultCookie("sessStart", Long.toString(sessStart));
-			sessStartc.setHttpOnly(true);
-			sessStartc.setPath("/");
-			cookies.remove(sessStartc);
-
-			sessStartc.setMaxAge(sessStart + validityWindow);
-			cookies.add(sessStartc);
-
-			userIdc = new DefaultCookie("userId", userId);
-			userIdc.setHttpOnly(true);
-			userIdc.setPath("/");
-			cookies.remove(userIdc);
-
-			userIdc.setMaxAge(sessStart + validityWindow);
-			cookies.add(userIdc);
-
-			resp.headers().set(HttpHeaders.Names.SET_COOKIE, ServerCookieEncoder.encode(cookies));
-		}
-
-		if (sessIdc == null || userIdc == null || sessStartc == null)
-		{ // invalid request, opensession first
-			logger.error("Invalid request, session doesnt exist!");
-			FullHttpResponse resp = request.setResponse(HttpResponseStatus.UNAUTHORIZED, ctx.alloc().buffer().writeBytes("Authorization absent, kindly sign-in first".getBytes()));
-			ctx.writeAndFlush(new FullEncodedResponse(request, resp));
-			return;
-		}
-
-		if (sessId == null)
-			sessId = sessIdc.getValue();
-		if (userId == null)
-			userId = userIdc.getValue();
-		if (sessStart < 0)
-			sessStart = Long.valueOf(sessStartc.getValue());
-
-		String csessid = getSessId(userId, sessStart);
-
-		if (!csessid.equals(sessId))
-		{
-			logger.error("Invalid credentials {} {}!!", sessId, csessid);
-			sendResponse(ctx, request, HttpResponseStatus.UNAUTHORIZED, UNAUTH_ACCESS);
-			return;
-		}
-
-		long elapseSecs = System.currentTimeMillis() / 1000L - sessStart;
-		if (elapseSecs > Config.getInstance().getHttpValidityWindow())
-		{
-			sendResponse(ctx, request, HttpResponseStatus.UNAUTHORIZED, String.format(SESSION_EXPIRED, elapseSecs));
-			return;
-		}
-
-		if (path.matches("/logout") && accessMethod == HttpMethod.DELETE)
-		{
-			sendResponse(ctx, request, HttpResponseStatus.OK, SESSION_DELETED);
-			ctx.close();
-			return;
+			long elapseSecs = System.currentTimeMillis() / 1000L - sessStart;
+			if (elapseSecs > Config.getInstance().getHttpValidityWindow())
+			{
+				sendResponse(ctx, request, HttpResponseStatus.UNAUTHORIZED, String.format(SESSION_EXPIRED, elapseSecs));
+				return;
+			}
+			setClientAuthenticated(true);
 		}
 
 		ctx.fireChannelRead(request);
@@ -281,9 +294,14 @@ public class AuthHandler extends SimpleChannelInboundHandler<Request>
 
 	private boolean reqValid(Request request) throws IOException
 	{
+		if (isClientAuthenticated())
+			return true;
 		String token = request.getHttpRequest().headers().get("auth-token");
 		if (Config.getInstance().getAuthToken().equals(token))
+		{
+			setClientAuthenticated(true);
 			return true;
+		}
 		return false;
 	}
 
@@ -291,5 +309,15 @@ public class AuthHandler extends SimpleChannelInboundHandler<Request>
 	{
 		FullHttpResponse resp = new DefaultFullHttpResponse(req.getHttpRequest().getProtocolVersion(), status, ctx.alloc().buffer().writeBytes(msg.getBytes()));
 		ctx.writeAndFlush(new FullEncodedResponse(req, resp));
+	}
+
+	private boolean isClientAuthenticated()
+	{
+		return isClientValid;
+	}
+
+	private void setClientAuthenticated(boolean isAuth)
+	{
+		isClientValid = isAuth;
 	}
 }
