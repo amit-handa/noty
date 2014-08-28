@@ -44,7 +44,7 @@ import com.fasterxml.jackson.core.type.TypeReference;
 public class AuthHandler extends SimpleChannelInboundHandler<Request>
 {
 	// process all the uconfs and populate user-data
-	
+
 	private static final Logger logger = LoggerFactory.getLogger(AuthHandler.class);
 
 	private static String UNAUTH_ACCESS = "Unauthorized access: kindly sign-in again";
@@ -60,7 +60,6 @@ public class AuthHandler extends SimpleChannelInboundHandler<Request>
 	private Mac mac;
 
 	private static SecretKeySpec sks;
-
 
 	/**
 	 * All the security stuff should be common for all the channels, and should be instantiated before processing
@@ -152,31 +151,34 @@ public class AuthHandler extends SimpleChannelInboundHandler<Request>
 		String path = request.getRequestPath();
 		HttpMethod accessMethod = httpReq.getMethod();
 
-        if( accessMethod != HttpMethod.POST && !path.equals("/logout" )) {
+		if (accessMethod != HttpMethod.POST && !path.equals("/logout"))
+		{
 			logger.error("Invalid request, Method not supported!");
-            FullHttpResponse resp = request.setResponse(HttpResponseStatus.UNAUTHORIZED, ctx.alloc().buffer().writeBytes("Authorization absent, kindly sign-in first".getBytes() ) );
-            ctx.writeAndFlush(new FullEncodedResponse( request, resp ));
+			FullHttpResponse resp = request.setResponse(HttpResponseStatus.UNAUTHORIZED, ctx.alloc().buffer().writeBytes("Authorization absent, kindly sign-in first".getBytes()));
+			ctx.writeAndFlush(new FullEncodedResponse(request, resp));
 			return;
-        }
+		}
 
-        Set< Cookie > cookies = request.cookies();
-        if( cookies == null )
-        	cookies = new HashSet< Cookie >();
+		Set<Cookie> cookies = request.cookies();
+		if (cookies == null)
+			cookies = new HashSet<Cookie>();
 
 		Cookie sessIdc = null, userIdc = null, sessStartc = null;
-		for( Cookie c : cookies ) {
-			switch( c.getName()) {
-			case "sessId" :
+		for (Cookie c : cookies)
+		{
+			switch (c.getName())
+			{
+			case "sessId":
 				sessIdc = c;
 				break;
-			case "userId" :
+			case "userId":
 				userIdc = c;
 				break;
-			case "sessStart" :
+			case "sessStart":
 				sessStartc = c;
 				break;
-            default:
-                break;
+			default:
+				break;
 			}
 		}
 
@@ -184,68 +186,74 @@ public class AuthHandler extends SimpleChannelInboundHandler<Request>
 		String userId = userIdc != null ? userIdc.getValue() : null;
 		long sessStart = sessStartc != null ? Long.valueOf(sessStartc.getValue()) : -1;
 
-        if (path.matches("/login" ) && ( sessIdc == null || userId == null || sessStart == -1 ) ) {
-            String body = httpReq.content().toString( CharsetUtil.UTF_8 );
+		if (path.matches("/login") && (sessIdc == null || userId == null || sessStart == -1))
+		{
+			String body = httpReq.content().toString(CharsetUtil.UTF_8);
 
 			logger.info("Login request: {} {}", path, body);
-			Map< String, String > credentials = Utils.om.readValue( body, new TypeReference< Map< String, String > >() {} );
-            userId = credentials.get("userId");
+			Map<String, String> credentials = Utils.om.readValue(body, new TypeReference<Map<String, String>>()
+			{
+			});
+			userId = credentials.get("userId");
 
-            if (userId == null) { // authenticate userId
-                logger.debug("Cannot validate User {}, Fix it, continuing as usual !" );
-                // return null;
-            }
-    
-            sessStart = System.currentTimeMillis() / 1000L;
-            sessId = getSessId( userId, sessStart );
+			if (userId == null)
+			{ // authenticate userId
+				logger.debug("Cannot validate User {}, Fix it, continuing as usual !");
+				// return null;
+			}
 
-            FullHttpResponse resp = request.setResponse( HttpResponseStatus.OK, Unpooled.buffer(0) );
-            for( Cookie reqcookie : cookies ) {
-            	reqcookie.setMaxAge( 0 );
-            }
+			sessStart = System.currentTimeMillis() / 1000L;
+			sessId = getSessId(userId, sessStart);
 
-            sessIdc = new DefaultCookie( "sessId", sessId );
-            sessIdc.setHttpOnly( true );
-            sessIdc.setPath("/");
-            cookies.remove( sessIdc );
+			FullHttpResponse resp = request.setResponse(HttpResponseStatus.OK, Unpooled.buffer(0));
+			for (Cookie reqcookie : cookies)
+			{
+				reqcookie.setMaxAge(0);
+			}
 
-            sessIdc.setMaxAge( sessStart + validityWindow );
-            cookies.add( sessIdc );
+			sessIdc = new DefaultCookie("sessId", sessId);
+			sessIdc.setHttpOnly(true);
+			sessIdc.setPath("/");
+			cookies.remove(sessIdc);
 
-            sessStartc = new DefaultCookie( "sessStart", Long.toString(sessStart) );
-            sessStartc.setHttpOnly( true );
-            sessStartc.setPath("/");
-            cookies.remove( sessStartc );
+			sessIdc.setMaxAge(sessStart + validityWindow);
+			cookies.add(sessIdc);
 
-            sessStartc.setMaxAge( sessStart + validityWindow );
-            cookies.add( sessStartc );
+			sessStartc = new DefaultCookie("sessStart", Long.toString(sessStart));
+			sessStartc.setHttpOnly(true);
+			sessStartc.setPath("/");
+			cookies.remove(sessStartc);
 
-            userIdc = new DefaultCookie( "userId", userId );
-            userIdc.setHttpOnly( true );
-            userIdc.setPath("/");
-            cookies.remove( userIdc );
+			sessStartc.setMaxAge(sessStart + validityWindow);
+			cookies.add(sessStartc);
 
-            userIdc.setMaxAge( sessStart + validityWindow );
-            cookies.add( userIdc );
+			userIdc = new DefaultCookie("userId", userId);
+			userIdc.setHttpOnly(true);
+			userIdc.setPath("/");
+			cookies.remove(userIdc);
 
-            resp.headers().set( HttpHeaders.Names.SET_COOKIE, ServerCookieEncoder.encode( cookies ) );
-        }
-        
-        if (sessIdc == null || userIdc == null || sessStartc == null ) { // invalid request, opensession first
+			userIdc.setMaxAge(sessStart + validityWindow);
+			cookies.add(userIdc);
+
+			resp.headers().set(HttpHeaders.Names.SET_COOKIE, ServerCookieEncoder.encode(cookies));
+		}
+
+		if (sessIdc == null || userIdc == null || sessStartc == null)
+		{ // invalid request, opensession first
 			logger.error("Invalid request, session doesnt exist!");
-            FullHttpResponse resp = request.setResponse(HttpResponseStatus.UNAUTHORIZED, ctx.alloc().buffer().writeBytes("Authorization absent, kindly sign-in first".getBytes() ) );
-            ctx.writeAndFlush(new FullEncodedResponse( request, resp ));
+			FullHttpResponse resp = request.setResponse(HttpResponseStatus.UNAUTHORIZED, ctx.alloc().buffer().writeBytes("Authorization absent, kindly sign-in first".getBytes()));
+			ctx.writeAndFlush(new FullEncodedResponse(request, resp));
 			return;
 		}
 
-        if( sessId == null )
-            sessId = sessIdc.getValue();
-		if( userId == null )
-            userId = userIdc.getValue();
-		if( sessStart < 0 )
-            sessStart = Long.valueOf( sessStartc.getValue() );
-		
-		String csessid = getSessId( userId, sessStart );
+		if (sessId == null)
+			sessId = sessIdc.getValue();
+		if (userId == null)
+			userId = userIdc.getValue();
+		if (sessStart < 0)
+			sessStart = Long.valueOf(sessStartc.getValue());
+
+		String csessid = getSessId(userId, sessStart);
 
 		if (!csessid.equals(sessId))
 		{
