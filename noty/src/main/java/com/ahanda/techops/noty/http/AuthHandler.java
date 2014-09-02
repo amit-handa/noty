@@ -29,6 +29,7 @@ import org.slf4j.LoggerFactory;
 
 import com.ahanda.techops.noty.Config;
 import com.ahanda.techops.noty.NotyConstants;
+import com.ahanda.techops.noty.SessionManager;
 import com.ahanda.techops.noty.Utils;
 import com.ahanda.techops.noty.http.message.FullEncodedResponse;
 import com.ahanda.techops.noty.http.message.Request;
@@ -62,6 +63,8 @@ public class AuthHandler extends SimpleChannelInboundHandler<Request>
 	private static SecretKeySpec sks;
 
 	private boolean isClientValid = false;
+	
+	private String uid;
 
 	/**
 	 * All the security stuff should be common for all the channels, and should be instantiated before processing
@@ -152,6 +155,8 @@ public class AuthHandler extends SimpleChannelInboundHandler<Request>
 		{
 			sendResponse(ctx, request, HttpResponseStatus.OK, SESSION_DELETED);
 			setClientAuthenticated(false);
+			SessionManager.getInstance().removeSession(uid);
+			uid = null;
 			ctx.close();
 			return;
 		}
@@ -287,11 +292,24 @@ public class AuthHandler extends SimpleChannelInboundHandler<Request>
 				return;
 			}
 			setClientAuthenticated(true);
+			uid = userId;
+			SessionManager.getInstance().addSession(uid, ctx);
 		}
 
 		ctx.fireChannelRead(request);
 	}
 
+	/*
+	 * when channel is inactive i.e closed simply remove the user from sessions map
+	 */
+	@Override
+	public void channelInactive(ChannelHandlerContext ctx) throws Exception
+	{
+		super.channelInactive(ctx);
+		SessionManager.getInstance().removeSession(uid);
+		uid = null;
+	}
+	
 	private boolean reqValid(Request request) throws IOException
 	{
 		if (isClientAuthenticated())
