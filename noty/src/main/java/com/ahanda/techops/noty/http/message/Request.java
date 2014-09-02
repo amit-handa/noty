@@ -17,11 +17,13 @@ public class Request
 {
 
 	private final FullHttpRequest httpRequest;
+
 	private FullHttpResponse httpResponse;
-	private Set< Cookie > cookies;
+
+	private Set<Cookie> cookies;
 
 	private final long orderNumber;
-	
+
 	private final String reqPath;
 
 	public Request(FullHttpRequest httpRequest, long orderNumber)
@@ -29,7 +31,7 @@ public class Request
 		this.httpRequest = httpRequest;
 		this.orderNumber = orderNumber;
 		QueryStringDecoder queryStringDecoder = new QueryStringDecoder(httpRequest.getUri());
-		reqPath =  queryStringDecoder.path();
+		reqPath = queryStringDecoder.path();
 	}
 
 	public long getOrderNumber()
@@ -41,31 +43,34 @@ public class Request
 	{
 		return httpRequest;
 	}
-	
+
 	public String getRequestPath()
 	{
 		return reqPath;
 	}
 
-	public Set< Cookie > cookies() {
-		if( cookies == null ) {
-            String cookiestr = httpRequest.headers().get( HttpHeaders.Names.COOKIE );
-            if( cookiestr != null )
-                cookies = CookieDecoder.decode( cookiestr );
+	public Set<Cookie> cookies()
+	{
+		if (cookies == null)
+		{
+			String cookiestr = httpRequest.headers().get(HttpHeaders.Names.COOKIE);
+			if (cookiestr != null)
+				cookies = CookieDecoder.decode(cookiestr);
 		}
 		return cookies;
 	}
 
-	public FullHttpResponse getResponse() {
+	public FullHttpResponse getResponse()
+	{
 		return httpResponse;
 	}
 
-	public FullHttpResponse setResponse( HttpResponseStatus status, ByteBuf buf )
+	public FullHttpResponse setResponse(HttpResponseStatus status, ByteBuf buf)
 	{
-		if( httpResponse != null )
+		if (httpResponse != null)
 			return null;
 
-        httpResponse = new DefaultFullHttpResponse( httpRequest.getProtocolVersion(), status, buf );
-        return httpResponse;
+		httpResponse = new DefaultFullHttpResponse(httpRequest.getProtocolVersion(), status, buf);
+		return httpResponse;
 	}
 }
