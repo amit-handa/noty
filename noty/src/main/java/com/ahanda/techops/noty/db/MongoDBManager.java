@@ -10,6 +10,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 
+import javax.swing.text.html.HTMLDocument.HTMLReader.IsindexAction;
+
 import org.bson.types.ObjectId;
 import org.json.JSONException;
 import org.slf4j.Logger;
@@ -19,6 +21,7 @@ import com.ahanda.techops.noty.Config;
 import com.ahanda.techops.noty.NotyConstants.MONGODB;
 import com.ahanda.techops.noty.Utils;
 import com.fasterxml.jackson.databind.JsonNode;
+import com.mongodb.BasicDBList;
 import com.mongodb.BasicDBObject;
 import com.mongodb.CommandResult;
 import com.mongodb.DB;
@@ -38,6 +41,8 @@ public class MongoDBManager
 	private DB pintDb;
 
 	private DBCollection events;
+
+	private DBCollection userColl;
 
 	private static volatile MongoDBManager instance;
 
@@ -71,6 +76,7 @@ public class MongoDBManager
 		dbconn = new MongoClient(host, port);
 		pintDb = dbconn.getDB(MONGODB.PINT_DB);
 		events = pintDb.getCollection(MONGODB.EVENTS_COLL);
+		userColl = pintDb.getCollection(MONGODB.USERS_COLL);
 		l.info("Events DB non-null : {}", dbconn);
 		ensureIndex();
 	}
@@ -271,6 +277,90 @@ public class MongoDBManager
 		for (DBObject o : result)
 		{
 			results.add(o.toMap());
+		}
+		return results;
+	}
+
+	public boolean subscribeNotification(String userId, Map<String, Object> matcher)
+	{
+		List<Object> queryList = (List<Object>) matcher.get("notification");
+		BasicDBObject notfQuery = buildQuery(queryList);
+		BasicDBObject userObj = new BasicDBObject().append("_id", userId);
+		BasicDBObject notificationObj = new BasicDBObject().append("$addToSet", new BasicDBObject("notifications", notfQuery));
+		userColl.update(userObj, notificationObj, true, false);
+		return true;
+	}
+
+	private BasicDBObject buildQuery(List<Object> queryList)
+	{
+		BasicDBList dbl = null;
+		BasicDBObject subQueryObject = null;
+
+		if (queryList.size() > 1) // this means there is an OR query
+			dbl = new BasicDBList();
+
+		for (Object q : queryList)
+		{
+			List<Object> subQuery = (List<Object>) q;
+			subQueryObject = new BasicDBObject();
+			for (Object sq : subQuery)
+			{
+				/* here we will get the map of key value pairs to apply AND operator */
+				Map<String, Object> m = (Map<String, Object>) sq;
+				String type = "eq";
+				if (m.containsKey("type"))
+				{
+					type = (String) m.get("type");
+					m.remove("type");
+				}
+				
+				for (Entry<String, Object> e : m.entrySet()) // there will be just one key value pair in this
+				{
+					String key = e.getKey();
+					Object val = e.getValue();
+					switch (type)
+					{
+					case "ne":
+					case "gt":
+					case "gte":
+					case "lt":
+					case "lte":
+						subQueryObject.append(key, new BasicDBObject("$" + type, val));
+						break;
+					case "range":
+						List<Object> l = (List<Object>) val;
+						long v1 = (long) l.get(0);
+						long v2 = (long) l.get(1);
+						subQueryObject.append(key, new BasicDBObject("$gte", v1).append("$lte", v2));
+						break;
+					case "eq":
+						subQueryObject.append(key, val);
+						break;
+					}
+				}
+			}
+			if (dbl != null)
+				dbl.add(subQueryObject);
+		}
+		if(dbl != null) // shows there is a OR here
+			return new BasicDBObject("$or", dbl);
+		return subQueryObject;
+	}
+
+	public List<Map> getNotifications(String userId, Map<String, Object> matcher)
+	{
+		List<Object> queryList = (List<Object>) matcher.get("notification");
+		//int limit = (Integer) matcher.get("limit");
+		//String objId = (String)matcher.get("objectId");
+		//ObjectId objectId = new ObjectId(objId);
+		BasicDBObject dbquery = new BasicDBObject();
+		BasicDBObject notfQuery = buildQuery(queryList);
+		DBCursor cursor = events.find(notfQuery);
+		List<Map> results = new ArrayList<Map>();
+		while(cursor.hasNext())
+		{
+			DBObject dbo = cursor.next();
+			results.add(dbo.toMap());
 		}
 		return results;
 	}

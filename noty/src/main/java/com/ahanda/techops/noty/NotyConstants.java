@@ -37,5 +37,6 @@ public class NotyConstants
 		public static final String ESOURCE_COL = "esource";
 
 		public static final String ETIME_COL = "etime";
+
 	}
 }

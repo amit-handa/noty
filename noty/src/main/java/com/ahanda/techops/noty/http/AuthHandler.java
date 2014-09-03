@@ -63,8 +63,6 @@ public class AuthHandler extends SimpleChannelInboundHandler<Request>
 	private static SecretKeySpec sks;
 
 	private boolean isClientValid = false;
-	
-	private String uid;
 
 	/**
 	 * All the security stuff should be common for all the channels, and should be instantiated before processing
@@ -155,8 +153,6 @@ public class AuthHandler extends SimpleChannelInboundHandler<Request>
 		{
 			sendResponse(ctx, request, HttpResponseStatus.OK, SESSION_DELETED);
 			setClientAuthenticated(false);
-			SessionManager.getInstance().removeSession(uid);
-			uid = null;
 			ctx.close();
 			return;
 		}
@@ -292,8 +288,7 @@ public class AuthHandler extends SimpleChannelInboundHandler<Request>
 				return;
 			}
 			setClientAuthenticated(true);
-			uid = userId;
-			SessionManager.getInstance().addSession(uid, ctx);
+			request.setUserId(userId);
 		}
 
 		ctx.fireChannelRead(request);
@@ -306,8 +301,6 @@ public class AuthHandler extends SimpleChannelInboundHandler<Request>
 	public void channelInactive(ChannelHandlerContext ctx) throws Exception
 	{
 		super.channelInactive(ctx);
-		SessionManager.getInstance().removeSession(uid);
-		uid = null;
 	}
 	
 	private boolean reqValid(Request request) throws IOException

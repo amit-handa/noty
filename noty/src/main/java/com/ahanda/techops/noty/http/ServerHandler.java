@@ -38,8 +38,9 @@ import com.fasterxml.jackson.core.type.TypeReference;
 
 /**
  * 
- * @author Gautam This class is used to decode the request into FullHttpRequest object. This class will internally handle the form/json or any other form of request. If payload is
- *         json (content type : json), it will be parsed using Jackson's JSON decoder, for form handling it will be handled accordingly
+ * @author Gautam This class is used to decode the request into FullHttpRequest object. This class will internally
+ *         handle the form/json or any other form of request. If payload is json (content type : json), it will be
+ *         parsed using Jackson's JSON decoder, for form handling it will be handled accordingly
  */
 public class ServerHandler extends SimpleChannelInboundHandler<Request>
 {
@@ -84,11 +85,150 @@ public class ServerHandler extends SimpleChannelInboundHandler<Request>
 		case "users":
 			handleUsers(paths, ctx, request);
 			break;
+		case "notifications":
+			handleNotificiations(paths, ctx, request);
+			break;
 		default:
 			l.error("Invalid resource requested {}", cpath);
 			throw new NotyException(HttpResponseStatus.NOT_FOUND, "Invalid resource requested : " + cpath);
 		}
 
+	}
+
+	private void handleNotificiations(List<String> paths, ChannelHandlerContext ctx, Request request) throws NotyException
+	{
+		if (paths.isEmpty())
+		{
+			l.error("Invalid event resource requested");
+			throw new NotyException(HttpResponseStatus.NOT_FOUND, "Invalid event resource requested");
+		}
+		String cpath = paths.get(0);
+
+		switch (cpath)
+		{
+		case "subscribe":
+			subscribeNotifications(ctx, request);
+			break;
+		case "get":
+			retrieveNotifications(ctx, request);
+			break;
+			
+		default:
+			l.error("Invalid event resource requested {}", cpath);
+			throw new NotyException(HttpResponseStatus.NOT_FOUND, "Invalid event resource requested : " + cpath);
+		}
+	}
+
+	private void retrieveNotifications(final ChannelHandlerContext ctx, final Request request) throws NotyException
+	{
+		final String userId = request.getUserId();
+		FullHttpRequest httpRequest = request.getHttpRequest();
+		l.debug("received request for publishing message !!!! ");
+		String jsonString = httpRequest.content().toString(CharsetUtil.UTF_8);
+		final Map<String, Object> matcher;
+		try
+		{
+			matcher = Utils.om.readValue(jsonString, new TypeReference<HashMap<String, Object>>()
+			{
+			});
+			Future<List<Map>> future = executor.submit(new Callable<List<Map>>()
+			{
+				@Override
+				public List<Map> call() throws Exception
+				{
+					return MongoDBManager.getInstance().getNotifications(userId, matcher);
+				}
+			});
+			future.addListener(new GenericFutureListener<Future<List<Map>>>()
+			{
+				@Override
+				public void operationComplete(Future<List<Map>> future) throws Exception
+				{
+					if (!future.isSuccess())
+					{
+						ctx.fireExceptionCaught(new NotyException(request, HttpResponseStatus.INTERNAL_SERVER_ERROR, future.cause()));
+						return;
+					}
+
+					List<Map> result = future.get();
+
+					if (result == null)
+					{
+						sendResponse(ctx, request, HttpResponseStatus.INTERNAL_SERVER_ERROR);
+					}
+					else
+					{
+						FullHttpResponse resp = request.getResponse();
+						String msg = "Subscribed to notification successfully";
+
+						DefaultFullHttpResponse nresp = new DefaultFullHttpResponse(resp.getProtocolVersion(), HttpResponseStatus.OK, ctx.alloc().buffer()
+								.writeBytes(msg.getBytes()));
+						nresp.headers().add(resp.headers());
+						ctx.writeAndFlush(new FullEncodedResponse(request, nresp));
+					}
+				}
+			});
+		}
+		catch (Exception e)
+		{
+			l.error("Exception while creating a map from output", e);
+			throw new NotyException(request, HttpResponseStatus.UNPROCESSABLE_ENTITY, e);
+		}
+	}
+
+	private void subscribeNotifications(final ChannelHandlerContext ctx, final Request request) throws NotyException
+	{
+		final String userId = request.getUserId();
+		FullHttpRequest httpRequest = request.getHttpRequest();
+		l.debug("received request for publishing message !!!! ");
+		String jsonString = httpRequest.content().toString(CharsetUtil.UTF_8);
+		final Map<String, Object> matcher;
+		try
+		{
+			matcher = Utils.om.readValue(jsonString, new TypeReference<HashMap<String, Object>>()
+			{
+			});
+			Future<Boolean> future = executor.submit(new Callable<Boolean>()
+			{
+				@Override
+				public Boolean call() throws Exception
+				{
+					return MongoDBManager.getInstance().subscribeNotification(userId, matcher);
+				}
+			});
+			future.addListener(new GenericFutureListener<Future<Boolean>>()
+			{
+				@Override
+				public void operationComplete(Future<Boolean> future) throws Exception
+				{
+					if (!future.isSuccess())
+					{
+						ctx.fireExceptionCaught(new NotyException(request, HttpResponseStatus.INTERNAL_SERVER_ERROR, future.cause()));
+						return;
+					}
+
+					Boolean result = future.get();
+
+					if (result == false)
+					{
+						sendResponse(ctx, request, HttpResponseStatus.INTERNAL_SERVER_ERROR);
+					}
+					else
+					{
+						String msg = "Subscribed to notification successfully";
+
+						DefaultFullHttpResponse resp = new DefaultFullHttpResponse(request.getHttpRequest().getProtocolVersion(), HttpResponseStatus.OK, ctx.alloc().buffer()
+								.writeBytes(msg.getBytes()));
+						ctx.writeAndFlush(new FullEncodedResponse(request, resp));
+					}
+				}
+			});
+		}
+		catch (Exception e)
+		{
+			l.error("Exception while creating a map from output", e);
+			throw new NotyException(request, HttpResponseStatus.UNPROCESSABLE_ENTITY, e);
+		}
 	}
 
 	private void handleUsers(final List<String> paths, final ChannelHandlerContext ctx, final Request request) throws NotyException
@@ -216,20 +356,20 @@ public class ServerHandler extends SimpleChannelInboundHandler<Request>
 
 		FullHttpResponse resp = request.getResponse();
 		assert resp != null;
-		
-        Future<Map<String, Object>> future = executor.submit(new Callable<Map<String, Object>>()
+
+		Future<Map<String, Object>> future = executor.submit(new Callable<Map<String, Object>>()
 		{
 			@Override
 			public Map<String, Object> call() throws Exception
 			{
-				Map< String, Object > cmd = new LinkedHashMap< String, Object >();
-				cmd.put( "distinct", "events");
-				cmd.put( "key", "source");
+				Map<String, Object> cmd = new LinkedHashMap<String, Object>();
+				cmd.put("distinct", "events");
+				cmd.put("key", "source");
 
 				Map<String, Object> op = new LinkedHashMap<String, Object>();
 				op.put("action", "command");
 				op.put("db", "pint");
-				op.put("command", cmd );
+				op.put("command", cmd);
 				return MongoDBManager.getInstance().execOp(op);
 			}
 		});
@@ -246,24 +386,24 @@ public class ServerHandler extends SimpleChannelInboundHandler<Request>
 
 				Map<String, Object> sources = future.get();
 
-				if (sources == null )
+				if (sources == null)
 				{
-					sendResponse(ctx, request, HttpResponseStatus.INTERNAL_SERVER_ERROR );
+					sendResponse(ctx, request, HttpResponseStatus.INTERNAL_SERVER_ERROR);
 				}
 				else
 				{
 					FullHttpResponse resp = request.getResponse();
-					Map< String, Object > config = new HashMap< String, Object >();
-					config.put( "esources", sources.get("values") );
-                    String msg = Utils.om.writeValueAsString( config );
+					Map<String, Object> config = new HashMap<String, Object>();
+					config.put("esources", sources.get("values"));
+					String msg = Utils.om.writeValueAsString(config);
 
-					DefaultFullHttpResponse nresp = new DefaultFullHttpResponse( resp.getProtocolVersion(), HttpResponseStatus.OK, ctx.alloc().buffer().writeBytes( msg.getBytes() ));
-					nresp.headers().add( resp.headers() );
+					DefaultFullHttpResponse nresp = new DefaultFullHttpResponse(resp.getProtocolVersion(), HttpResponseStatus.OK, ctx.alloc().buffer().writeBytes(msg.getBytes()));
+					nresp.headers().add(resp.headers());
 
-					ctx.writeAndFlush( new FullEncodedResponse( request, nresp ) );
+					ctx.writeAndFlush(new FullEncodedResponse(request, nresp));
 				}
 			}
-		});	
+		});
 	}
 
 	private void handleEvents(final List<String> paths, final ChannelHandlerContext ctx, final Request request) throws NotyException
@@ -347,7 +487,7 @@ public class ServerHandler extends SimpleChannelInboundHandler<Request>
 				else
 				{
 					resp = HttpResponseStatus.OK;
-					msg = Utils.om.writeValueAsString( event.get( "results"));
+					msg = Utils.om.writeValueAsString(event.get("results"));
 					sendJsonResponse(ctx, request, resp, msg);
 				}
 			}
@@ -357,12 +497,12 @@ public class ServerHandler extends SimpleChannelInboundHandler<Request>
 	private void pubEvents(final ChannelHandlerContext ctx, final Request request) throws NotyException
 	{
 		FullHttpRequest httpRequest = request.getHttpRequest();
-		l.debug("received request for publishing message !!!! " );
+		l.debug("received request for publishing message !!!! ");
 		final List<Object> eventList;
 		try
 		{
 			String jsonString = httpRequest.content().toString(CharsetUtil.UTF_8);
-			l.debug( "eventlist body {}", jsonString );
+			l.debug("eventlist body {}", jsonString);
 			eventList = Utils.om.readValue(jsonString, new TypeReference<ArrayList<Object>>()
 			{
 			});

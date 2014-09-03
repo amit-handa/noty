@@ -25,6 +25,8 @@ public class Request
 	private final long orderNumber;
 
 	private final String reqPath;
+	
+	private String userId;
 
 	public Request(FullHttpRequest httpRequest, long orderNumber)
 	{
@@ -72,5 +74,15 @@ public class Request
 
 		httpResponse = new DefaultFullHttpResponse(httpRequest.getProtocolVersion(), status, buf);
 		return httpResponse;
+	}
+	
+	public void setUserId(String userId)
+	{
+		this.userId = userId;
+	}
+	
+	public String getUserId()
+	{
+		return this.userId;
 	}
 }
