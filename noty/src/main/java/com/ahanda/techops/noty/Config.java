@@ -88,9 +88,9 @@ public class Config
 	}
 
 	@SuppressWarnings("unchecked")
-	public long getHttpValidityWindow()
+	public int getHttpValidityWindow()
 	{
-		return (long)((Map<String, Object>)configMap.get(NotyConstants.HTTP)).get( NotyConstants.HTTP_SESSIONS_VALIDITY );
+		return (int)((Map<String, Object>)configMap.get(NotyConstants.HTTP)).get( NotyConstants.HTTP_SESSIONS_VALIDITY );
 	}
 	
 	@SuppressWarnings("unchecked")
