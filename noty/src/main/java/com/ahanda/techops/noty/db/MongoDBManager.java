@@ -19,6 +19,7 @@ import com.ahanda.techops.noty.Config;
 import com.ahanda.techops.noty.NotyConstants.MONGODB;
 import com.ahanda.techops.noty.Utils;
 import com.fasterxml.jackson.databind.JsonNode;
+import com.mongodb.BasicDBList;
 import com.mongodb.BasicDBObject;
 import com.mongodb.CommandResult;
 import com.mongodb.DB;
@@ -38,6 +39,8 @@ public class MongoDBManager
 	private DB pintDb;
 
 	private DBCollection events;
+
+	private DBCollection userColl;
 
 	private static volatile MongoDBManager instance;
 
@@ -71,6 +74,7 @@ public class MongoDBManager
 		dbconn = new MongoClient(host, port);
 		pintDb = dbconn.getDB(MONGODB.PINT_DB);
 		events = pintDb.getCollection(MONGODB.EVENTS_COLL);
+		userColl = pintDb.getCollection(MONGODB.USERS_COLL);
 		l.info("Events DB non-null : {}", dbconn);
 		ensureIndex();
 	}
@@ -250,28 +254,144 @@ public class MongoDBManager
 	}
 
 	/**
-	 * This function returns the paged entries from the MongoDB. Pass the minimum ObjectId and it will return all the
-	 * values greater than that. Results will be in the ascending order.
+	 * This will return all the events (do not use this unless required)
+	 * 
+	 * @return
+	 */
+	public List<Map> getPagedEvents()
+	{
+		return getPagedEvents(null, -1, null);
+	}
+
+	/**
+	 * This will return all the events less than given Object Id
+	 * 
+	 * @param id
+	 * @param dbquery
+	 * @return
+	 */
+	public List<Map> getAllPagedEvents(ObjectId id, BasicDBObject dbquery)
+	{
+		return getPagedEvents(id, -1, dbquery);
+	}
+
+	/**
+	 * This function returns the paged entries from the MongoDB. Pass the ObjectId and it will return all the values
+	 * less than than that. Results will be in the ascending order.
+	 * 
+	 * If limit is <= 0, then it will return all the values (not recommended)
 	 * 
 	 * @param id
 	 * @param limit
+	 * @param dbquery
 	 * @return
 	 */
 	@SuppressWarnings("rawtypes")
-	public List<Map> getPagedEvents(ObjectId id, int limit)
+	public List<Map> getPagedEvents(ObjectId id, int limit, BasicDBObject dbquery)
 	{
-		BasicDBObject dbquery = new BasicDBObject();
+		if (dbquery == null)
+			dbquery = new BasicDBObject();
+
 		if (id != null)
 			dbquery.append("_id", new BasicDBObject().append("$lt", id));
 
-		DBCursor result = events.find(dbquery).limit(limit).sort(new BasicDBObject().append("_id", -1));
+		DBCursor result;
+
+		if (limit > 0)
+			result = events.find(dbquery).limit(limit).sort(new BasicDBObject().append("_id", -1));
+		else
+			result = events.find(dbquery).sort(new BasicDBObject().append("_id", -1));
+
 		if (result == null)
 			return null;
 		List<Map> results = new ArrayList<Map>();
 		for (DBObject o : result)
-		{
 			results.add(o.toMap());
-		}
+
 		return results;
 	}
+
+	public boolean subscribeNotification(String userId, Map<String, Object> matcher)
+	{
+		List<Object> queryList = (List<Object>) matcher.get("notification");
+		BasicDBObject notfQuery = buildQuery(queryList);
+		BasicDBObject userObj = new BasicDBObject().append("_id", userId);
+		BasicDBObject notificationObj = new BasicDBObject().append("$addToSet", new BasicDBObject("notifications", notfQuery));
+		userColl.update(userObj, notificationObj, true, false);
+		return true;
+	}
+
+	private BasicDBObject buildQuery(List<Object> queryList)
+	{
+		BasicDBList dbl = null;
+		BasicDBObject subQueryObject = null;
+
+		if (queryList.size() > 1) // this means there is an OR query
+			dbl = new BasicDBList();
+
+		for (Object q : queryList)
+		{
+			List<Object> subQuery = (List<Object>) q;
+			subQueryObject = new BasicDBObject();
+			for (Object sq : subQuery)
+			{
+				/* here we will get the map of key value pairs to apply AND operator */
+				Map<String, Object> m = (Map<String, Object>) sq;
+				String type = "eq";
+				if (m.containsKey("type"))
+				{
+					type = (String) m.get("type");
+					m.remove("type");
+				}
+
+				for (Entry<String, Object> e : m.entrySet()) // there will be just one key value pair in this
+				{
+					String key = e.getKey();
+					Object val = e.getValue();
+					switch (type)
+					{
+					case "ne":
+					case "gt":
+					case "gte":
+					case "lt":
+					case "lte":
+						subQueryObject.append(key, new BasicDBObject("$" + type, val));
+						break;
+					case "range":
+						List<Object> l = (List<Object>) val;
+						long v1 = (long) l.get(0);
+						long v2 = (long) l.get(1);
+						subQueryObject.append(key, new BasicDBObject("$gte", v1).append("$lte", v2));
+						break;
+					case "eq":
+						subQueryObject.append(key, val);
+						break;
+					}
+				}
+			}
+			if (dbl != null)
+				dbl.add(subQueryObject);
+		}
+		if (dbl != null) // shows there is a OR here
+			return new BasicDBObject("$or", dbl);
+		return subQueryObject;
+	}
+
+	public List<Map> getNotifications(String userId, Map<String, Object> matcher)
+	{
+		List<Object> queryList = (List<Object>) matcher.get("notification");
+
+		int limit = -1;
+		if (matcher.containsKey("limit"))
+			limit = (Integer) matcher.get("limit");
+		String objId = null;
+		if (matcher.containsKey("objectId"))
+			objId = (String) matcher.get("objectId");
+		ObjectId objectId = null;
+		if (objId != null)
+			objectId = new ObjectId(objId);
+		BasicDBObject notfQuery = buildQuery(queryList);
+		return getPagedEvents(objectId, limit, notfQuery);
+	}
+
 }

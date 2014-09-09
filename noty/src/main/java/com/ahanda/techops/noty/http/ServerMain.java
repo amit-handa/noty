@@ -1,8 +1,5 @@
 package com.ahanda.techops.noty.http;
 
-import static com.ahanda.techops.noty.NotyConstants.HOST;
-import static com.ahanda.techops.noty.NotyConstants.HTTP_MAX_REQUEST_SIZE;
-import static com.ahanda.techops.noty.NotyConstants.PORT;
 import io.netty.bootstrap.ServerBootstrap;
 import io.netty.channel.ChannelFuture;
 import io.netty.channel.ChannelInitializer;
@@ -25,8 +22,6 @@ import org.slf4j.LoggerFactory;
 import com.ahanda.techops.noty.Config;
 import com.ahanda.techops.noty.db.MongoDBManager;
 import com.ahanda.techops.noty.http.exception.DefaultExceptionHandler;
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.node.ObjectNode;
 
 /**
  * Discards any incoming data.
@@ -64,7 +59,7 @@ public class ServerMain
 			l.error("Exception while reading config file, server cannot be started", e);
 			return;
 		}
-
+		
 		host = cf.getHttpHost();
 		port = cf.getHttpPort();
 

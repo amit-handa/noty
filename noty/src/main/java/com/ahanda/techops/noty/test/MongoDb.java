@@ -27,7 +27,7 @@ public class MongoDb
 		cf.setupConfig();
 		m = MongoDBManager.getInstance();
 		// insertEvents(500);
-		List<Map> result = m.getPagedEvents(null, 50);
+		List<Map> result = m.getPagedEvents(null, 50, null);
 		long t1 = (long) result.get(0).get("etime");
 		long t2 = (long) result.get(result.size() - 1).get("etime");
 		String ev1 = (String) result.get(0).get("esource");
@@ -35,7 +35,7 @@ public class MongoDb
 		System.out.println("Latest Time : " + t1 + " , 50th element time : " + t2);
 		System.out.println("Latest event : " + ev1 + " , 50th element event : " + ev2);
 		ObjectId id = (ObjectId) result.get(result.size() - 1).get("_id");
-		result = m.getPagedEvents(id, 50);
+		result = m.getPagedEvents(id, 50, null);
 		t1 = (long) result.get(0).get("etime");
 		t2 = (long) result.get(result.size() - 1).get("etime");
 		ev1 = (String) result.get(0).get("esource");

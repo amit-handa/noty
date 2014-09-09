@@ -287,11 +287,21 @@ public class AuthHandler extends SimpleChannelInboundHandler<Request>
 				return;
 			}
 			setClientAuthenticated(true);
+			request.setUserId(userId);
 		}
 
 		ctx.fireChannelRead(request);
 	}
 
+	/*
+	 * when channel is inactive i.e closed simply remove the user from sessions map
+	 */
+	@Override
+	public void channelInactive(ChannelHandlerContext ctx) throws Exception
+	{
+		super.channelInactive(ctx);
+	}
+	
 	private boolean reqValid(Request request) throws IOException
 	{
 		if (isClientAuthenticated())
