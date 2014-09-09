@@ -1,8 +1,5 @@
 package com.ahanda.techops.noty.http.message;
 
-import java.util.HashSet;
-import java.util.Set;
-
 import io.netty.buffer.ByteBuf;
 import io.netty.handler.codec.http.Cookie;
 import io.netty.handler.codec.http.CookieDecoder;
@@ -12,6 +9,8 @@ import io.netty.handler.codec.http.FullHttpResponse;
 import io.netty.handler.codec.http.HttpHeaders;
 import io.netty.handler.codec.http.HttpResponseStatus;
 import io.netty.handler.codec.http.QueryStringDecoder;
+
+import java.util.Set;
 
 public class Request
 {

@@ -112,7 +112,7 @@ public class ServerHandler extends SimpleChannelInboundHandler<Request>
 		case "get":
 			retrieveNotifications(ctx, request);
 			break;
-			
+
 		default:
 			l.error("Invalid event resource requested {}", cpath);
 			throw new NotyException(HttpResponseStatus.NOT_FOUND, "Invalid event resource requested : " + cpath);
@@ -158,13 +158,22 @@ public class ServerHandler extends SimpleChannelInboundHandler<Request>
 					}
 					else
 					{
-						FullHttpResponse resp = request.getResponse();
-						String msg = "Subscribed to notification successfully";
+						List<Map> events = future.get();
 
-						DefaultFullHttpResponse nresp = new DefaultFullHttpResponse(resp.getProtocolVersion(), HttpResponseStatus.OK, ctx.alloc().buffer()
-								.writeBytes(msg.getBytes()));
-						nresp.headers().add(resp.headers());
-						ctx.writeAndFlush(new FullEncodedResponse(request, nresp));
+						HttpResponseStatus resp = HttpResponseStatus.OK;
+						String msg;
+						if (events == null)
+						{
+							resp = HttpResponseStatus.INTERNAL_SERVER_ERROR;
+							msg = "Internal Server Error";
+							sendResponse(ctx, request, resp);
+						}
+						else
+						{
+							resp = HttpResponseStatus.OK;
+							msg = Utils.om.writeValueAsString(events);
+							sendJsonResponse(ctx, request, resp, msg);
+						}
 					}
 				}
 			});

@@ -20,7 +20,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.ahanda.techops.noty.Config;
-import com.ahanda.techops.noty.SessionManager;
 import com.ahanda.techops.noty.db.MongoDBManager;
 import com.ahanda.techops.noty.http.exception.DefaultExceptionHandler;
 
@@ -60,8 +59,6 @@ public class ServerMain
 			l.error("Exception while reading config file, server cannot be started", e);
 			return;
 		}
-
-		SessionManager.getInstance();
 		
 		host = cf.getHttpHost();
 		port = cf.getHttpPort();

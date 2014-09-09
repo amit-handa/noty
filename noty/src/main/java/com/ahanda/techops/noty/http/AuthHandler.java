@@ -29,7 +29,6 @@ import org.slf4j.LoggerFactory;
 
 import com.ahanda.techops.noty.Config;
 import com.ahanda.techops.noty.NotyConstants;
-import com.ahanda.techops.noty.SessionManager;
 import com.ahanda.techops.noty.Utils;
 import com.ahanda.techops.noty.http.message.FullEncodedResponse;
 import com.ahanda.techops.noty.http.message.Request;

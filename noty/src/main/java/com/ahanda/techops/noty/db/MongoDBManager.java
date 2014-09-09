@@ -256,28 +256,60 @@ public class MongoDBManager
 	}
 
 	/**
-	 * This function returns the paged entries from the MongoDB. Pass the minimum ObjectId and it will return all the
-	 * values greater than that. Results will be in the ascending order.
+	 * This will return all the events (do not use this unless required)
+	 * 
+	 * @return
+	 */
+	public List<Map> getPagedEvents()
+	{
+		return getPagedEvents(null, -1, null);
+	}
+
+	/**
+	 * This will return all the events less than given Object Id
+	 * 
+	 * @param id
+	 * @param dbquery
+	 * @return
+	 */
+	public List<Map> getAllPagedEvents(ObjectId id, BasicDBObject dbquery)
+	{
+		return getPagedEvents(id, -1, dbquery);
+	}
+
+	/**
+	 * This function returns the paged entries from the MongoDB. Pass the ObjectId and it will return all the values
+	 * less than than that. Results will be in the ascending order.
+	 * 
+	 * If limit is <= 0, then it will return all the values (not recommended)
 	 * 
 	 * @param id
 	 * @param limit
+	 * @param dbquery
 	 * @return
 	 */
 	@SuppressWarnings("rawtypes")
-	public List<Map> getPagedEvents(ObjectId id, int limit)
+	public List<Map> getPagedEvents(ObjectId id, int limit, BasicDBObject dbquery)
 	{
-		BasicDBObject dbquery = new BasicDBObject();
+		if (dbquery == null)
+			dbquery = new BasicDBObject();
+
 		if (id != null)
 			dbquery.append("_id", new BasicDBObject().append("$lt", id));
 
-		DBCursor result = events.find(dbquery).limit(limit).sort(new BasicDBObject().append("_id", -1));
+		DBCursor result;
+
+		if (limit > 0)
+			result = events.find(dbquery).limit(limit).sort(new BasicDBObject().append("_id", -1));
+		else
+			result = events.find(dbquery).sort(new BasicDBObject().append("_id", -1));
+
 		if (result == null)
 			return null;
 		List<Map> results = new ArrayList<Map>();
 		for (DBObject o : result)
-		{
 			results.add(o.toMap());
-		}
+
 		return results;
 	}
 
@@ -313,7 +345,7 @@ public class MongoDBManager
 					type = (String) m.get("type");
 					m.remove("type");
 				}
-				
+
 				for (Entry<String, Object> e : m.entrySet()) // there will be just one key value pair in this
 				{
 					String key = e.getKey();
@@ -342,7 +374,7 @@ public class MongoDBManager
 			if (dbl != null)
 				dbl.add(subQueryObject);
 		}
-		if(dbl != null) // shows there is a OR here
+		if (dbl != null) // shows there is a OR here
 			return new BasicDBObject("$or", dbl);
 		return subQueryObject;
 	}
@@ -350,18 +382,18 @@ public class MongoDBManager
 	public List<Map> getNotifications(String userId, Map<String, Object> matcher)
 	{
 		List<Object> queryList = (List<Object>) matcher.get("notification");
-		//int limit = (Integer) matcher.get("limit");
-		//String objId = (String)matcher.get("objectId");
-		//ObjectId objectId = new ObjectId(objId);
-		BasicDBObject dbquery = new BasicDBObject();
+
+		int limit = -1;
+		if (matcher.containsKey("limit"))
+			limit = (Integer) matcher.get("limit");
+		String objId = null;
+		if (matcher.containsKey("objectId"))
+			objId = (String) matcher.get("objectId");
+		ObjectId objectId = null;
+		if (objId != null)
+			objectId = new ObjectId(objId);
 		BasicDBObject notfQuery = buildQuery(queryList);
-		DBCursor cursor = events.find(notfQuery);
-		List<Map> results = new ArrayList<Map>();
-		while(cursor.hasNext())
-		{
-			DBObject dbo = cursor.next();
-			results.add(dbo.toMap());
-		}
-		return results;
+		return getPagedEvents(objectId, limit, notfQuery);
 	}
+
 }
