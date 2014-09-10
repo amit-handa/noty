@@ -86,7 +86,7 @@ public class ServerHandler extends SimpleChannelInboundHandler<Request>
 			handleUsers(paths, ctx, request);
 			break;
 		case "notifications":
-			handleNotificiations(paths, ctx, request);
+			handleNotifications(paths, ctx, request);
 			break;
 		default:
 			l.error("Invalid resource requested {}", cpath);
@@ -95,7 +95,7 @@ public class ServerHandler extends SimpleChannelInboundHandler<Request>
 
 	}
 
-	private void handleNotificiations(List<String> paths, ChannelHandlerContext ctx, Request request) throws NotyException
+	private void handleNotifications(List<String> paths, ChannelHandlerContext ctx, Request request) throws NotyException
 	{
 		if (paths.isEmpty())
 		{
