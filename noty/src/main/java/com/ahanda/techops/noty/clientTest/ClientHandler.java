@@ -54,8 +54,8 @@ public class ClientHandler extends SimpleChannelInboundHandler<HttpObject>
 
 	int state = 0;	// 0 -> pub event, 1 -> getevent
 
-	static JSONObject getEvents = new JSONObject().put( "source", "PROD.Topaz" );
-	Set< Cookie > sessCookies = new HashSet< Cookie >();
+	static JSONObject getEvents = new JSONObject().put( "source", "TEST.Netty" );
+	Set< Cookie > sessCookies;
 
 	private void getEvents(Channel ch, FullHttpResponse resp ) {
         StringWriter estr = new StringWriter();
@@ -79,7 +79,7 @@ public class ClientHandler extends SimpleChannelInboundHandler<HttpObject>
         ch.writeAndFlush(request);
 	}
 
-    public static void login( Channel ch, JSONObject credential ) {
+    public void login( Channel ch, JSONObject credential ) {
         StringWriter estr = new StringWriter();
         credential.write(estr);
         String contentStr = estr.toString();
@@ -89,6 +89,8 @@ public class ClientHandler extends SimpleChannelInboundHandler<HttpObject>
         request.headers().set(HttpHeaders.Names.CONNECTION, HttpHeaders.Values.KEEP_ALIVE);
         request.headers().set(HttpHeaders.Names.ACCEPT_ENCODING, HttpHeaders.Values.GZIP);
         request.headers().set(HttpHeaders.Names.CONTENT_TYPE, "application/json" );
+        if( sessCookies != null )
+            request.headers().set(HttpHeaders.Names.COOKIE, ClientCookieEncoder.encode( sessCookies ) );
 
         request.headers().set(HttpHeaders.Names.CONTENT_LENGTH, request.content().readableBytes());
 
@@ -193,8 +195,9 @@ public class ClientHandler extends SimpleChannelInboundHandler<HttpObject>
 			FullHttpResponse resp = (FullHttpResponse)msg;
             for( String cookiestr : resp.headers().getAll( HttpHeaders.Names.SET_COOKIE ) ) {
                 Set< Cookie > tmp = CookieDecoder.decode( cookiestr );
-                sessCookies.addAll( tmp );
+                sessCookies = tmp;
             }
+            //login( ctx.channel(), credential );
 			pubEvent( ctx.channel(), event, (FullHttpResponse)msg );
 			break;
 		case 2:

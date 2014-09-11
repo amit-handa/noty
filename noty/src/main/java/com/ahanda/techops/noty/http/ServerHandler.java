@@ -364,7 +364,8 @@ public class ServerHandler extends SimpleChannelInboundHandler<Request>
 		assert paths.isEmpty();
 
 		FullHttpResponse resp = request.getResponse();
-		assert resp != null;
+		if( resp == null )
+            resp = request.setResponse(HttpResponseStatus.OK, Unpooled.buffer(0));
 
 		Future<Map<String, Object>> future = executor.submit(new Callable<Map<String, Object>>()
 		{
