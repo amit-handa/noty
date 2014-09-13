@@ -461,8 +461,6 @@ public class ServerHandler extends SimpleChannelInboundHandler<Request>
 			{
 				Map<String, Object> op = new LinkedHashMap<String, Object>();
 				op.put("action", "find");
-				op.put("db", "pint");
-				op.put("collection", "events");
 				op.put("matcher", matcher);
 				return MongoDBManager.getInstance().execOp(op);
 			}
