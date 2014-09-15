@@ -197,18 +197,18 @@ public class ServerHandler extends SimpleChannelInboundHandler<Request>
 			matcher = Utils.om.readValue(jsonString, new TypeReference<HashMap<String, Object>>()
 			{
 			});
-			Future<Boolean> future = executor.submit(new Callable<Boolean>()
+			Future<Map<String,Object>> future = executor.submit(new Callable<Map<String,Object>>()
 			{
 				@Override
-				public Boolean call() throws Exception
+				public Map<String,Object> call() throws Exception
 				{
 					return MongoDBManager.getInstance().subscribeNotification(userId, matcher);
 				}
 			});
-			future.addListener(new GenericFutureListener<Future<Boolean>>()
+			future.addListener(new GenericFutureListener<Future<Map<String,Object>>>()
 			{
 				@Override
-				public void operationComplete(Future<Boolean> future) throws Exception
+				public void operationComplete(Future<Map<String,Object>> future) throws Exception
 				{
 					if (!future.isSuccess())
 					{
@@ -216,19 +216,16 @@ public class ServerHandler extends SimpleChannelInboundHandler<Request>
 						return;
 					}
 
-					Boolean result = future.get();
+					Map<String,Object> result = future.get();
 
-					if (result == false)
+					if (result == null)
 					{
 						sendResponse(ctx, request, HttpResponseStatus.INTERNAL_SERVER_ERROR);
 					}
 					else
 					{
-						String msg = "Subscribed to notification successfully";
-
-						DefaultFullHttpResponse resp = new DefaultFullHttpResponse(request.getHttpRequest().getProtocolVersion(), HttpResponseStatus.OK, ctx.alloc().buffer()
-								.writeBytes(msg.getBytes()));
-						ctx.writeAndFlush(new FullEncodedResponse(request, resp));
+						String msg = Utils.om.writeValueAsString(result);
+						sendJsonResponse(ctx, request, HttpResponseStatus.OK, msg);
 					}
 				}
 			});
@@ -364,8 +361,8 @@ public class ServerHandler extends SimpleChannelInboundHandler<Request>
 		assert paths.isEmpty();
 
 		FullHttpResponse resp = request.getResponse();
-		if( resp == null )
-            resp = request.setResponse(HttpResponseStatus.OK, Unpooled.buffer(0));
+		if (resp == null)
+			resp = request.setResponse(HttpResponseStatus.OK, Unpooled.buffer(0));
 
 		Future<Map<String, Object>> future = executor.submit(new Callable<Map<String, Object>>()
 		{

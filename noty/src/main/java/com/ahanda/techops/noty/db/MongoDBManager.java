@@ -19,6 +19,7 @@ import com.ahanda.techops.noty.Config;
 import com.ahanda.techops.noty.NotyConstants;
 import com.ahanda.techops.noty.NotyConstants.MONGODB;
 import com.ahanda.techops.noty.Utils;
+import com.ahanda.techops.noty.http.exception.NotyException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.mongodb.BasicDBList;
 import com.mongodb.BasicDBObject;
@@ -28,6 +29,7 @@ import com.mongodb.DBCollection;
 import com.mongodb.DBCursor;
 import com.mongodb.DBObject;
 import com.mongodb.MongoClient;
+import com.mongodb.MongoException;
 import com.mongodb.WriteResult;
 import com.mongodb.util.JSON;
 
@@ -304,7 +306,7 @@ public class MongoDBManager
 
 		if (id != null)
 		{
-			if(order == -1)
+			if (order == -1)
 				dbquery.append("_id", new BasicDBObject().append("$lt", id));
 			else
 				dbquery.append("_id", new BasicDBObject().append("$gt", id));
@@ -330,14 +332,45 @@ public class MongoDBManager
 		return results;
 	}
 
-	public boolean subscribeNotification(String userId, Map<String, Object> matcher)
+	public Map<String,Object> subscribeNotification(String userId, Map<String, Object> matcher) throws Exception
 	{
+		WriteResult result = null;
 		List<Object> queryList = (List<Object>) matcher.get("notification");
 		BasicDBObject notfQuery = buildQuery(queryList);
+		int id = notfQuery.hashCode();
+		notfQuery.append("subscription_id", id);
 		BasicDBObject userObj = new BasicDBObject().append("_id", userId);
-		BasicDBObject notificationObj = new BasicDBObject().append("$addToSet", new BasicDBObject("notifications", notfQuery));
-		userColl.update(userObj, notificationObj, true, false);
-		return true;
+		BasicDBObject notificationObj = new BasicDBObject().append("$addToSet", new BasicDBObject("notifications", notfQuery.toString()));
+		result = userColl.update(userObj, notificationObj, true, false);
+		CommandResult cmd = result.getLastError();
+		Map<String,Object> r = new HashMap<String, Object>();
+		r.put("subscription_id", id);
+		r.put("updatedExisting", false);
+		if (cmd != null)
+		{
+			if (!cmd.ok())
+			{
+				String message = cmd.getErrorMessage();
+				l.error(message);
+				try
+				{
+					cmd.throwOnError();
+				}
+				catch (MongoException me)
+				{
+					throw new Exception(me);
+				}
+			}
+			else
+			{
+				boolean isExists = cmd.getBoolean("updatedExisting");
+				if (isExists)
+				{
+					r.put("updatedExisting", isExists);
+				}
+			}
+		}
+		return r;
 	}
 
 	private BasicDBObject buildQuery(List<Object> queryList)
