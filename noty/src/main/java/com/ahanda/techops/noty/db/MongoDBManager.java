@@ -332,7 +332,7 @@ public class MongoDBManager
 		return results;
 	}
 
-	public Map<String,Object> subscribeNotification(String userId, Map<String, Object> matcher) throws Exception
+	public Map<String, Object> subscribeNotification(String userId, Map<String, Object> matcher) throws Exception
 	{
 		WriteResult result = null;
 		List<Object> queryList = (List<Object>) matcher.get("notification");
@@ -343,7 +343,7 @@ public class MongoDBManager
 		BasicDBObject notificationObj = new BasicDBObject().append("$addToSet", new BasicDBObject("notifications", notfQuery.toString()));
 		result = userColl.update(userObj, notificationObj, true, false);
 		CommandResult cmd = result.getLastError();
-		Map<String,Object> r = new HashMap<String, Object>();
+		Map<String, Object> r = new HashMap<String, Object>();
 		r.put("subscription_id", id);
 		r.put("updatedExisting", false);
 		if (cmd != null)
@@ -432,7 +432,6 @@ public class MongoDBManager
 	public List<Map> getNotifications(String userId, Map<String, Object> matcher)
 	{
 		List<Object> queryList = (List<Object>) matcher.get("notification");
-
 		int limit = -1;
 		if (matcher.containsKey("limit"))
 			limit = (Integer) matcher.get("limit");
@@ -447,5 +446,50 @@ public class MongoDBManager
 			order = (int) matcher.get("order");
 		BasicDBObject notfQuery = buildQuery(queryList);
 		return getPagedEvents(objectId, limit, notfQuery, order);
+	}
+
+	public Map<Integer, List<Map>> getAllNotifications(String userId, Map<String, Object> matcher)
+	{
+		Map<Integer, List<Map>> map = new HashMap<Integer, List<Map>>();
+		int limit = -1;
+		if (matcher.containsKey("limit"))
+			limit = (Integer) matcher.get("limit");
+		String objId = null;
+		if (matcher.containsKey("objectId"))
+			objId = (String) matcher.get("objectId");
+		ObjectId objectId = null;
+		if (objId != null)
+			objectId = new ObjectId(objId);
+		int order = -1;
+		if (matcher.containsKey("order"))
+			order = (int) matcher.get("order");
+		BasicDBList bl = getAllSubscriptions(userId);
+		for (Object o : bl)
+		{
+			if (o instanceof String)
+			{
+				BasicDBObject bo = (BasicDBObject) com.mongodb.util.JSON.parse((String)o);
+				int value = (int) bo.remove("subscription_id");
+				List<Map> l = getPagedEvents(objectId, Integer.MAX_VALUE, bo, order);
+				map.put(value, l);
+			}
+		}
+		return map;
+	}
+
+	public BasicDBList getAllSubscriptions(String userId)
+	{
+		BasicDBList l = null;
+		BasicDBObject query = new BasicDBObject("_id", userId);
+		DBObject result = userColl.findOne(query);
+		if (result != null)
+		{
+			Object obj = result.get("notifications");
+			if (obj != null)
+			{
+				l = (BasicDBList) obj;
+			}
+		}
+		return l;
 	}
 }

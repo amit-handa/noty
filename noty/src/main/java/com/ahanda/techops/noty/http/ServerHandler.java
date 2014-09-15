@@ -109,8 +109,8 @@ public class ServerHandler extends SimpleChannelInboundHandler<Request>
 		case "subscribe":
 			subscribeNotifications(ctx, request);
 			break;
-		case "get":
-			retrieveNotifications(ctx, request);
+		case "getall":
+			retrieveAllNotifications(ctx, request);
 			break;
 
 		default:
@@ -119,7 +119,7 @@ public class ServerHandler extends SimpleChannelInboundHandler<Request>
 		}
 	}
 
-	private void retrieveNotifications(final ChannelHandlerContext ctx, final Request request) throws NotyException
+	private void retrieveAllNotifications(final ChannelHandlerContext ctx, final Request request) throws NotyException
 	{
 		final String userId = request.getUserId();
 		FullHttpRequest httpRequest = request.getHttpRequest();
@@ -131,18 +131,18 @@ public class ServerHandler extends SimpleChannelInboundHandler<Request>
 			matcher = Utils.om.readValue(jsonString, new TypeReference<HashMap<String, Object>>()
 			{
 			});
-			Future<List<Map>> future = executor.submit(new Callable<List<Map>>()
+			Future<Map<Integer, List<Map>>> future = executor.submit(new Callable<Map<Integer, List<Map>>>()
 			{
 				@Override
-				public List<Map> call() throws Exception
+				public Map<Integer, List<Map>> call() throws Exception
 				{
-					return MongoDBManager.getInstance().getNotifications(userId, matcher);
+					return MongoDBManager.getInstance().getAllNotifications(userId, matcher);
 				}
 			});
-			future.addListener(new GenericFutureListener<Future<List<Map>>>()
+			future.addListener(new GenericFutureListener<Future<Map<Integer, List<Map>>>>()
 			{
 				@Override
-				public void operationComplete(Future<List<Map>> future) throws Exception
+				public void operationComplete(Future<Map<Integer, List<Map>>> future) throws Exception
 				{
 					if (!future.isSuccess())
 					{
@@ -150,7 +150,7 @@ public class ServerHandler extends SimpleChannelInboundHandler<Request>
 						return;
 					}
 
-					List<Map> result = future.get();
+					Map<Integer, List<Map>> result = future.get();
 
 					if (result == null)
 					{
@@ -158,22 +158,10 @@ public class ServerHandler extends SimpleChannelInboundHandler<Request>
 					}
 					else
 					{
-						List<Map> events = future.get();
-
 						HttpResponseStatus resp = HttpResponseStatus.OK;
-						String msg;
-						if (events == null)
-						{
-							resp = HttpResponseStatus.INTERNAL_SERVER_ERROR;
-							msg = "Internal Server Error";
-							sendResponse(ctx, request, resp);
-						}
-						else
-						{
-							resp = HttpResponseStatus.OK;
-							msg = Utils.om.writeValueAsString(events);
-							sendJsonResponse(ctx, request, resp, msg);
-						}
+						String msg = Utils.om.writeValueAsString(result);
+						resp = HttpResponseStatus.OK;
+						sendJsonResponse(ctx, request, resp, msg);
 					}
 				}
 			});
@@ -197,18 +185,18 @@ public class ServerHandler extends SimpleChannelInboundHandler<Request>
 			matcher = Utils.om.readValue(jsonString, new TypeReference<HashMap<String, Object>>()
 			{
 			});
-			Future<Map<String,Object>> future = executor.submit(new Callable<Map<String,Object>>()
+			Future<Map<String, Object>> future = executor.submit(new Callable<Map<String, Object>>()
 			{
 				@Override
-				public Map<String,Object> call() throws Exception
+				public Map<String, Object> call() throws Exception
 				{
 					return MongoDBManager.getInstance().subscribeNotification(userId, matcher);
 				}
 			});
-			future.addListener(new GenericFutureListener<Future<Map<String,Object>>>()
+			future.addListener(new GenericFutureListener<Future<Map<String, Object>>>()
 			{
 				@Override
-				public void operationComplete(Future<Map<String,Object>> future) throws Exception
+				public void operationComplete(Future<Map<String, Object>> future) throws Exception
 				{
 					if (!future.isSuccess())
 					{
@@ -216,7 +204,7 @@ public class ServerHandler extends SimpleChannelInboundHandler<Request>
 						return;
 					}
 
-					Map<String,Object> result = future.get();
+					Map<String, Object> result = future.get();
 
 					if (result == null)
 					{
