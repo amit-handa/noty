@@ -16,6 +16,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.ahanda.techops.noty.Config;
+import com.ahanda.techops.noty.NotyConstants;
 import com.ahanda.techops.noty.NotyConstants.MONGODB;
 import com.ahanda.techops.noty.Utils;
 import com.fasterxml.jackson.databind.JsonNode;
@@ -105,7 +106,7 @@ public class MongoDBManager
 
 	public Map<String, Object> execOp(Map<String, Object> op)
 	{
-		DB db = dbconn.getDB((String) op.get("db"));
+		DB db = dbconn.getDB(NotyConstants.MONGODB.PINT_DB);
 		String action = (String) op.get("action");
 		DBCollection dbcoll = null;
 		switch (action)
@@ -115,7 +116,7 @@ public class MongoDBManager
 			List<Object> events = Utils.doCast(op.get("document"));
 			return doSave(dbcoll, events);
 		case "find":
-			dbcoll = db.getCollection((String) op.get("collection"));
+			dbcoll = db.getCollection(NotyConstants.MONGODB.EVENTS_COLL);
 			return doFind(dbcoll, op);
 		case "update":
 			dbcoll = db.getCollection((String) op.get("collection"));
@@ -147,15 +148,24 @@ public class MongoDBManager
 		l.info("reached exec find!");
 		Map<String, Object> retval = new LinkedHashMap<String, Object>();
 		Map<String, Object> matcher = Utils.doCast(op.get("matcher"));
-		DBObject dbquery = new BasicDBObject(matcher);
-
-		DBCursor result = dbcoll.find(dbquery);
-		List<Object> results = new ArrayList<Object>();
-		for (DBObject o : result)
+		int order = -1;
+		int limit = -1;
+		ObjectId _id = null;
+		BasicDBObject dbQuery = null;
+		if (matcher.containsKey("limit"))
+			limit = (int) matcher.get("limit");
+		if (matcher.containsKey("_id"))
+			_id = new ObjectId((String) matcher.get("_id"));
+		if (matcher.containsKey("query"))
+			dbQuery = new BasicDBObject((Map) matcher.get("query"));
+		if (matcher.containsKey("order"))
 		{
-			o.removeField("_id");
-			results.add(o.toMap());
+			// -1 corresponds to decreasing order, defailt mongodb
+			// convention
+			order = (int) matcher.get("order");
 		}
+
+		List<Map> results = getPagedEvents(_id, limit, dbQuery, order);
 
 		retval.put("results", results);
 		retval.put("status", "ok");
@@ -260,7 +270,7 @@ public class MongoDBManager
 	 */
 	public List<Map> getPagedEvents()
 	{
-		return getPagedEvents(null, -1, null);
+		return getPagedEvents(null, -1, null, -1);
 	}
 
 	/**
@@ -272,7 +282,7 @@ public class MongoDBManager
 	 */
 	public List<Map> getAllPagedEvents(ObjectId id, BasicDBObject dbquery)
 	{
-		return getPagedEvents(id, -1, dbquery);
+		return getPagedEvents(id, -1, dbquery, -1);
 	}
 
 	/**
@@ -287,27 +297,36 @@ public class MongoDBManager
 	 * @return
 	 */
 	@SuppressWarnings("rawtypes")
-	public List<Map> getPagedEvents(ObjectId id, int limit, BasicDBObject dbquery)
+	public List<Map> getPagedEvents(ObjectId id, int limit, BasicDBObject dbquery, int order)
 	{
 		if (dbquery == null)
 			dbquery = new BasicDBObject();
 
 		if (id != null)
-			dbquery.append("_id", new BasicDBObject().append("$lt", id));
+		{
+			if(order == -1)
+				dbquery.append("_id", new BasicDBObject().append("$lt", id));
+			else
+				dbquery.append("_id", new BasicDBObject().append("$gt", id));
+		}
 
 		DBCursor result;
 
 		if (limit > 0)
-			result = events.find(dbquery).limit(limit).sort(new BasicDBObject().append("_id", -1));
+			result = events.find(dbquery).limit(limit).sort(new BasicDBObject().append("_id", order));
 		else
-			result = events.find(dbquery).sort(new BasicDBObject().append("_id", -1));
+			result = events.find(dbquery).sort(new BasicDBObject().append("_id", order));
 
 		if (result == null)
 			return null;
 		List<Map> results = new ArrayList<Map>();
 		for (DBObject o : result)
+		{
+			String _id = ((ObjectId) o.get("_id")).toString();
+			o.removeField(_id);
+			o.put("_id", _id);
 			results.add(o.toMap());
-
+		}
 		return results;
 	}
 
@@ -390,8 +409,10 @@ public class MongoDBManager
 		ObjectId objectId = null;
 		if (objId != null)
 			objectId = new ObjectId(objId);
+		int order = -1;
+		if (matcher.containsKey("order"))
+			order = (int) matcher.get("order");
 		BasicDBObject notfQuery = buildQuery(queryList);
-		return getPagedEvents(objectId, limit, notfQuery);
+		return getPagedEvents(objectId, limit, notfQuery, order);
 	}
-
 }
