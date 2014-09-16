@@ -7,6 +7,7 @@ import static io.netty.handler.codec.http.HttpVersion.HTTP_1_1;
 import io.netty.buffer.Unpooled;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.SimpleChannelInboundHandler;
+import io.netty.handler.codec.http.DefaultFullHttpRequest;
 import io.netty.handler.codec.http.DefaultFullHttpResponse;
 import io.netty.handler.codec.http.FullHttpRequest;
 import io.netty.handler.codec.http.FullHttpResponse;
@@ -63,7 +64,7 @@ public class ServerHandler extends SimpleChannelInboundHandler<Request>
 	{
 		List<String> paths = new LinkedList<String>(Arrays.asList(request.getRequestPath().split("/")));
 
-		l.debug("paths {}", paths);
+		l.debug("paths {} {}", paths, request.getHttpRequest().content().toString(CharsetUtil.UTF_8) );
 		if (paths.size() > 0 && paths.get(0).isEmpty()) // leading '/'
 			paths.remove(0);
 
