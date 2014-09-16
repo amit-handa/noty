@@ -1,5 +1,6 @@
 package com.ahanda.techops.noty.test;
 
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -14,6 +15,7 @@ import com.fasterxml.jackson.core.JsonFactory;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
+import com.mongodb.BasicDBList;
 
 public class MongoDb
 {
@@ -26,6 +28,7 @@ public class MongoDb
 		cf = Config.getInstance();
 		cf.setupConfig();
 		m = MongoDBManager.getInstance();
+		Map<Integer, List<Map>> l = m.getAllNotifications(null, new HashMap<String, Object>());
 		// insertEvents(500);
 		int limit = 20;
 		List<Map> result = m.getPagedEvents(null, limit, null, -1);
