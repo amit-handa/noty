@@ -22,6 +22,10 @@ import java.io.IOException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import ch.qos.logback.classic.LoggerContext;
+import ch.qos.logback.classic.joran.JoranConfigurator;
+import ch.qos.logback.core.joran.spi.JoranException;
+
 import com.ahanda.techops.noty.Config;
 import com.ahanda.techops.noty.db.MongoDBManager;
 import com.ahanda.techops.noty.http.exception.DefaultExceptionHandler;
@@ -53,8 +57,19 @@ public class ServerMain
 		l.info("Instantiating server");
 	}
 
+    public void setupLogger() throws JoranException {
+        JoranConfigurator jc = new JoranConfigurator();
+        LoggerContext lc = (LoggerContext)LoggerFactory.getILoggerFactory();
+        jc.setContext( lc );
+        lc.reset();
+        jc.doConfigure( getClass().getResourceAsStream( "/logback-pint.xml" ) );
+    }
+	
 	public void run() throws Exception
 	{
+	
+		setupLogger();
+
 		try
 		{
 			Config cf = Config.getInstance();
