@@ -30,7 +30,7 @@ public class ServerMain
 {
 
 	private Config cf;
-	
+
 	private String host;
 
 	private int port;
@@ -59,7 +59,7 @@ public class ServerMain
 			l.error("Exception while reading config file, server cannot be started", e);
 			return;
 		}
-		
+
 		host = cf.getHttpHost();
 		port = cf.getHttpPort();
 
@@ -85,7 +85,7 @@ public class ServerMain
 							chp.addLast("aggregator", new HttpObjectAggregator(maxRequestSize));
 							chp.addLast("pintRequestDecoder", new RequestDecoder());
 							chp.addLast("httpPayloadEncoder", new ResponseEncoder());
-							chp.addLast("authHandler", new AuthHandler() );
+							chp.addLast("authHandler", new AuthHandler());
 							chp.addLast("serverHandler", new ServerHandler(group));
 							chp.addLast("httpExceptionHandler", new DefaultExceptionHandler());
 						}
@@ -115,12 +115,13 @@ public class ServerMain
 
 	public static void main(String[] args) throws Exception
 	{
-        if( args.length == 1 ) {
-			System.setProperty( "PINT.conf", args[0] );
-        }
-			
-        if( System.getProperty("PINT.conf") == null )
-        	throw new IllegalArgumentException();
+		if (args.length == 1)
+		{
+			System.setProperty("PINT.conf", args[0]);
+		}
+
+		if (System.getProperty("PINT.conf") == null)
+			throw new IllegalArgumentException();
 
 		new ServerMain().run();
 	}

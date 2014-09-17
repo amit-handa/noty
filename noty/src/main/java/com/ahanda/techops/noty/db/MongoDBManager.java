@@ -154,6 +154,9 @@ public class MongoDBManager
 		int limit = -1;
 		ObjectId _id = null;
 		BasicDBObject dbQuery = null;
+		String source = null;
+		if (matcher.containsKey("source"))
+			source = (String) matcher.get("source");
 		if (matcher.containsKey("limit"))
 			limit = (int) matcher.get("limit");
 		if (matcher.containsKey("_id"))
@@ -162,11 +165,14 @@ public class MongoDBManager
 			dbQuery = new BasicDBObject((Map) matcher.get("query"));
 		if (matcher.containsKey("order"))
 		{
-			// -1 corresponds to decreasing order, defailt mongodb
+			// -1 corresponds to decreasing order, default mongodb
 			// convention
 			order = (int) matcher.get("order");
 		}
-
+		if(dbQuery == null)
+		{
+			dbQuery = new BasicDBObject("source", source);
+		}
 		List<Map> results = getPagedEvents(_id, limit, dbQuery, order);
 
 		retval.put("results", results);
