@@ -169,7 +169,7 @@ public class MongoDBManager
 			// convention
 			order = (int) matcher.get("order");
 		}
-		if(dbQuery == null)
+		if (dbQuery == null)
 		{
 			dbQuery = new BasicDBObject("source", source);
 		}
@@ -396,10 +396,10 @@ public class MongoDBManager
 				/* here we will get the map of key value pairs to apply AND operator */
 				Map<String, Object> m = (Map<String, Object>) sq;
 				String type = "eq";
-				if (m.containsKey("type"))
+				if (m.containsKey("_type"))
 				{
-					type = (String) m.get("type");
-					m.remove("type");
+					type = (String) m.get("_type");
+					m.remove("_type");
 				}
 
 				for (Entry<String, Object> e : m.entrySet()) // there will be just one key value pair in this
@@ -456,8 +456,9 @@ public class MongoDBManager
 
 	public Map<Integer, List<Map>> getAllNotifications(String userId, Map<String, Object> matcher)
 	{
+		ObjectId lastObjectId = null;
 		Map<Integer, List<Map>> map = new HashMap<Integer, List<Map>>();
-		int limit = -1;
+		int limit = Integer.MAX_VALUE;
 		if (matcher.containsKey("limit"))
 			limit = (Integer) matcher.get("limit");
 		String objId = null;
@@ -470,20 +471,35 @@ public class MongoDBManager
 		if (matcher.containsKey("order"))
 			order = (int) matcher.get("order");
 		BasicDBList bl = getAllSubscriptions(userId);
+		int refVal = -1;
 		for (Object o : bl)
 		{
 			if (o instanceof String)
 			{
-				BasicDBObject bo = (BasicDBObject) com.mongodb.util.JSON.parse((String)o);
+				BasicDBObject bo = (BasicDBObject) com.mongodb.util.JSON.parse((String) o);
 				int value = (int) bo.remove("subscription_id");
-				List<Map> l = getPagedEvents(objectId, Integer.MAX_VALUE, bo, order);
-				map.put(value, l);
+				List<Map> l = getPagedEvents(objectId, limit, bo, order);
+				if (l != null && l.size() > 0)
+				{
+					map.put(value, l);
+					ObjectId lo = new ObjectId((String) l.get(l.size() - 1).get("_id"));
+					if(lastObjectId == null || ( lo != null && lastObjectId.compareTo(lo) == -1))
+					{
+						lastObjectId = lo;
+						refVal = value;
+					}
+				}
 			}
+		}
+		if(refVal != -1)
+		{
+			List<Map> l = map.get(refVal);
+			l.get(l.size() - 1).put("isLastId", true);
 		}
 		return map;
 	}
 
-	public BasicDBList getAllSubscriptions(String userId)
+	private BasicDBList getAllSubscriptions(String userId)
 	{
 		BasicDBList l = null;
 		BasicDBObject query = new BasicDBObject("_id", userId);
@@ -498,4 +514,21 @@ public class MongoDBManager
 		}
 		return l;
 	}
+	
+	public List<Map> getSubscriptions(String userId)
+	{
+		BasicDBList bl = getAllSubscriptions(userId);
+		if(bl == null)
+			return null;
+		List<Map> l = new ArrayList<>(bl.size());
+		for (Object o : bl)
+		{
+			if (o instanceof String)
+			{
+				BasicDBObject bo = (BasicDBObject) com.mongodb.util.JSON.parse((String) o);
+				l.add(bo.toMap());
+			}
+		}
+		return l;
+	} 
 }
