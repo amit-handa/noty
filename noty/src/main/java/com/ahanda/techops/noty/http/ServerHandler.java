@@ -112,10 +112,61 @@ public class ServerHandler extends SimpleChannelInboundHandler<Request>
 		case "getall":
 			retrieveAllNotifications(ctx, request);
 			break;
-
+		case "getsubscriptions":
+			retrieveSubscriptions(ctx, request);
+			break;
 		default:
 			l.error("Invalid event resource requested {}", cpath);
 			throw new NotyException(HttpResponseStatus.NOT_FOUND, "Invalid event resource requested : " + cpath);
+		}
+	}
+
+	private void retrieveSubscriptions(final ChannelHandlerContext ctx, final Request request) throws NotyException
+	{
+		final String userId = request.getUserId();
+		FullHttpRequest httpRequest = request.getHttpRequest();
+		l.debug("received request for publishing message !!!! ");
+		try
+		{
+			Future<List<Map>> future = executor.submit(new Callable<List<Map>>()
+			{
+				@Override
+				public List<Map> call() throws Exception
+				{
+					return MongoDBManager.getInstance().getSubscriptions(userId);
+				}
+			});
+			future.addListener(new GenericFutureListener<Future<List<Map>>>()
+			{
+				@Override
+				public void operationComplete(Future<List<Map>> future) throws Exception
+				{
+					if (!future.isSuccess())
+					{
+						ctx.fireExceptionCaught(new NotyException(request, HttpResponseStatus.INTERNAL_SERVER_ERROR, future.cause()));
+						return;
+					}
+
+					List<Map> result = future.get();
+
+					if (result == null)
+					{
+						sendResponse(ctx, request, HttpResponseStatus.INTERNAL_SERVER_ERROR);
+					}
+					else
+					{
+						HttpResponseStatus resp = HttpResponseStatus.OK;
+						String msg = Utils.om.writeValueAsString(result);
+						resp = HttpResponseStatus.OK;
+						sendJsonResponse(ctx, request, resp, msg);
+					}
+				}
+			});
+		}
+		catch (Exception e)
+		{
+			l.error("Exception while creating a map from output", e);
+			throw new NotyException(request, HttpResponseStatus.UNPROCESSABLE_ENTITY, e);
 		}
 	}
 
