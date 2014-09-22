@@ -474,24 +474,37 @@ public class MongoDBManager
 		int refVal = -1;
 		for (Object o : bl)
 		{
-			if (o instanceof String)
+			try
 			{
-				BasicDBObject bo = (BasicDBObject) com.mongodb.util.JSON.parse((String) o);
-				int value = (int) bo.remove("subscription_id");
-				List<Map> l = getPagedEvents(objectId, limit, bo, order);
-				if (l != null && l.size() > 0)
+
+				if (o instanceof String)
 				{
-					map.put(value, l);
-					ObjectId lo = new ObjectId((String) l.get(l.size() - 1).get("_id"));
-					if(lastObjectId == null || ( lo != null && lastObjectId.compareTo(lo) == -1))
+					BasicDBObject bo = (BasicDBObject) com.mongodb.util.JSON.parse((String) o);
+					int value = (int) bo.remove("subscription_id");
+					List<Map> l = getPagedEvents(objectId, limit, bo, order);
+					if (l != null && l.size() > 0)
 					{
-						lastObjectId = lo;
-						refVal = value;
+						map.put(value, l);
+						Object oj = l.get(l.size() - 1).get("_id");
+						ObjectId lo = null;
+						if (oj instanceof String)
+							lo = new ObjectId((String) oj);
+						else if (oj instanceof ObjectId)
+							lo = (ObjectId) lo;
+						if (lastObjectId == null || (lo != null && lastObjectId.compareTo(lo) == -1))
+						{
+							lastObjectId = lo;
+							refVal = value;
+						}
 					}
 				}
 			}
+			catch (Exception e)
+			{
+				l.error("Exception while creating notification event list", e);
+			}
 		}
-		if(refVal != -1)
+		if (refVal != -1)
 		{
 			List<Map> l = map.get(refVal);
 			l.get(l.size() - 1).put("isLastId", true);
@@ -514,11 +527,11 @@ public class MongoDBManager
 		}
 		return l;
 	}
-	
+
 	public List<Map> getSubscriptions(String userId)
 	{
 		BasicDBList bl = getAllSubscriptions(userId);
-		if(bl == null)
+		if (bl == null)
 			return null;
 		List<Map> l = new ArrayList<>(bl.size());
 		for (Object o : bl)
@@ -530,5 +543,5 @@ public class MongoDBManager
 			}
 		}
 		return l;
-	} 
+	}
 }
