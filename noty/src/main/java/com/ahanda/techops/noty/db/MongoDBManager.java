@@ -196,7 +196,7 @@ public class MongoDBManager
 		l.info("row : {} inserted. Rows affected : {}", dbcoll, n);
 
 		retval.put("status", "ok");
-		retval.put("results", n);
+		retval.put("result", n);
 		return retval;
 	}
 
