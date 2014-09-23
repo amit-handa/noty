@@ -51,17 +51,18 @@ public class ServerMain
 		l.info("Instantiating server");
 	}
 
-    public void setupLogger() throws JoranException {
-        JoranConfigurator jc = new JoranConfigurator();
-        LoggerContext lc = (LoggerContext)LoggerFactory.getILoggerFactory();
-        jc.setContext( lc );
-        lc.reset();
-        jc.doConfigure( getClass().getResourceAsStream( "/logback-pint.xml" ) );
-    }
-	
+	public void setupLogger() throws JoranException
+	{
+		JoranConfigurator jc = new JoranConfigurator();
+		LoggerContext lc = (LoggerContext) LoggerFactory.getILoggerFactory();
+		jc.setContext(lc);
+		lc.reset();
+		jc.doConfigure(getClass().getResourceAsStream("/logback-pint.xml"));
+	}
+
 	public void run() throws Exception
 	{
-	
+
 		setupLogger();
 
 		try
