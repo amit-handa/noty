@@ -556,28 +556,28 @@ public class ServerHandler extends SimpleChannelInboundHandler<Request>
 			l.error("Exception while json handling", e);
 			throw new NotyException(request, HttpResponseStatus.UNPROCESSABLE_ENTITY, e);
 		}
-		Future<Void> future = executor.submit(new Callable<Void>()
+		Future<Map<String, Object>> future = executor.submit(new Callable<Map<String, Object>>()
 		{
 			@Override
-			public Void call() throws JSONException, Exception
+			public Map<String, Object> call() throws JSONException, Exception
 			{
 				Map<String, Object> op = new LinkedHashMap<String, Object>();
 				op.put("action", "save");
 				op.put("db", "pint");
 				op.put("collection", "events");
 				op.put("document", eventList);
-				MongoDBManager.getInstance().execOp(op);
-				return null;
+				return MongoDBManager.getInstance().execOp(op);
 			}
 		});
-		future.addListener(new GenericFutureListener<Future<Void>>()
+		future.addListener(new GenericFutureListener<Future<Map<String, Object>>>()
 		{
 			@Override
-			public void operationComplete(Future<Void> future) throws Exception
+			public void operationComplete(Future<Map<String, Object>> future) throws Exception
 			{
+				Map<String, Object> result = future.get();
 				if (future.isSuccess())
 				{
-					sendResponse(ctx, request, HttpResponseStatus.OK);
+					sendResponse(ctx, request, HttpResponseStatus.OK, String.valueOf((int) result.get("result")));
 				}
 				else
 				{
@@ -589,7 +589,14 @@ public class ServerHandler extends SimpleChannelInboundHandler<Request>
 
 	private void sendResponse(ChannelHandlerContext ctx, Request request, HttpResponseStatus status)
 	{
-		FullHttpResponse httpResponse = new DefaultFullHttpResponse(request.getHttpRequest().getProtocolVersion(), status);
+		sendResponse(ctx, request, status, "");
+	}
+
+	private void sendResponse(ChannelHandlerContext ctx, Request request, HttpResponseStatus status, String msg)
+	{
+		if (msg == null)
+			msg = "";
+		FullHttpResponse httpResponse = new DefaultFullHttpResponse(request.getHttpRequest().getProtocolVersion(), status, Unpooled.copiedBuffer(msg, CharsetUtil.UTF_8));
 		FullEncodedResponse encodedResponse = new FullEncodedResponse(request, httpResponse);
 		ctx.writeAndFlush(encodedResponse);
 	}
