@@ -442,8 +442,8 @@ public class MongoDBManager
 		if (matcher.containsKey("limit"))
 			limit = (Integer) matcher.get("limit");
 		String objId = null;
-		if (matcher.containsKey("objectId"))
-			objId = (String) matcher.get("objectId");
+		if (matcher.containsKey("_id"))
+			objId = (String) matcher.get("_id");
 		ObjectId objectId = null;
 		if (objId != null)
 			objectId = new ObjectId(objId);
@@ -462,8 +462,8 @@ public class MongoDBManager
 		if (matcher.containsKey("limit"))
 			limit = (Integer) matcher.get("limit");
 		String objId = null;
-		if (matcher.containsKey("objectId"))
-			objId = (String) matcher.get("objectId");
+		if (matcher.containsKey("_id"))
+			objId = (String) matcher.get("_id");
 		ObjectId objectId = null;
 		if (objId != null)
 			objectId = new ObjectId(objId);
